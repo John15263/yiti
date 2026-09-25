@@ -13,9 +13,9 @@
 - Node.js 24 或更新（不需要 `npm install`，没有第三方依赖）
 - Chrome（或其他 Chromium 浏览器）
 - 模型的 API key，两部分可以分别选：
-  - 文字部分（翻译、拆块、检查、点评）：[Gemini](https://aistudio.google.com/apikey) 或 [DeepSeek](https://platform.deepseek.com)。
+  - 文字部分（翻译、拆块、检查、点评）：[Gemini](https://aistudio.google.com/apikey)、[DeepSeek](https://platform.deepseek.com)，或阿里云百炼的千问（和语音共用一个百炼 key）。
   - 语音陪练：Gemini Live，或阿里云百炼的 Qwen-Omni-Realtime（中国大陆可用，实测中文讲解很自然）。不配语音也能用，只是没有语音按钮。
-  - 在中国大陆，用 DeepSeek + 百炼就能不依赖 Google 跑全套。
+  - 在中国大陆，**一个百炼 key 就能跑全套**（文字用千问、语音用 Qwen-Omni），不需要 Google 账号。
 
 ## 安装
 
@@ -56,7 +56,7 @@ npm start               # 打开 http://127.0.0.1:4318
 | 变量 | 作用 |
 |---|---|
 | `GEMINI_API_KEY` | 文字部分（默认）和语音陪练 |
-| `TEXT_PROVIDER` | 文字部分用 `gemini`（默认）还是 `deepseek` |
+| `TEXT_PROVIDER` | 文字部分用 `gemini`（默认）、`deepseek` 还是 `qwen` |
 | `DEEPSEEK_API_KEY` | `TEXT_PROVIDER=deepseek` 时需要 |
 | `GEMINI_MODEL` / `GEMINI_TRANSLATE_MODEL` | 文字模型；翻译默认用更便宜的 flash-lite |
 | `VOICE_PROVIDER` | 语音用 `gemini`（默认）还是 `qwen` |

@@ -5,7 +5,7 @@ import { voiceProvider } from './voice-providers.mjs';
 // What the settings page may change: which services to use and their keys. It is kept in data/settings.json
 // (owner-only, never committed) and takes precedence over .env, so a key typed into the page wins over a file.
 const KEYS = ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'DASHSCOPE_API_KEY'];
-const CHOICES = { TEXT_PROVIDER: ['gemini', 'deepseek'], VOICE_PROVIDER: ['gemini', 'qwen', 'none'], DASHSCOPE_REGION: ['cn-beijing', 'ap-southeast-1'] };
+const CHOICES = { TEXT_PROVIDER: ['gemini', 'deepseek', 'qwen'], VOICE_PROVIDER: ['gemini', 'qwen', 'none'], DASHSCOPE_REGION: ['cn-beijing', 'ap-southeast-1'] };
 const NAMES = [...KEYS, ...Object.keys(CHOICES), 'DASHSCOPE_WORKSPACE_ID'];
 
 export class Settings {
@@ -59,8 +59,11 @@ export async function testServices(cfg, { request = fetch, connect = (url, optio
       return res.ok ? { ok: true } : { ok: false, message: res.status === 401 || res.status === 403 ? 'key 不对，或者没有权限' : `服务返回 HTTP ${res.status}` };
     } catch { return { ok: false, message: '连不上，检查网络' }; }
   };
+  const dashscope = `https://${cfg.dashscopeRegion === 'cn-beijing' ? 'dashscope' : 'dashscope-intl'}.aliyuncs.com/compatible-mode/v1/models`;
   const text = cfg.textProvider === 'deepseek'
     ? (cfg.deepseekKey ? await get('https://api.deepseek.com/models', { Authorization: `Bearer ${cfg.deepseekKey}` }) : { ok: false, message: '还没填 DeepSeek key' })
+    : cfg.textProvider === 'qwen'
+    ? (cfg.dashscopeKey ? await get(dashscope, { Authorization: `Bearer ${cfg.dashscopeKey}` }) : { ok: false, message: '还没填百炼 key' })
     : (cfg.geminiKey ? await get('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', { 'x-goog-api-key': cfg.geminiKey }) : { ok: false, message: '还没填 Gemini key' });
   const provider = voiceProvider(cfg);
   let voice;

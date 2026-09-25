@@ -20,7 +20,7 @@ cp .env.example .env
 - `GEMINI_API_KEY`：默认配置下文字部分和语音陪练都用它，在 https://aistudio.google.com/apikey 申请。用不了 Google 的话可以不填，按下面两条换成国内服务。
 - 只有 DeepSeek key 的话：填 `DEEPSEEK_API_KEY`，把 `TEXT_PROVIDER` 改成 `deepseek`。翻译、拆块、检查、点评都能用。
 - 语音陪练：默认 Gemini Live（用 `GEMINI_API_KEY`）。在中国大陆，改用阿里云百炼：`VOICE_PROVIDER=qwen`，填 `DASHSCOPE_API_KEY`，`DASHSCOPE_REGION` 选 `cn-beijing`（中国大陆的 key）或 `ap-southeast-1`（国际的 key），有工作空间 ID 就填 `DASHSCOPE_WORKSPACE_ID`。语音没配好时语音按钮不会出现，其余功能照常。
-- 所以在中国大陆，DeepSeek + 百炼两个 key 就能跑全套，不需要 Google 账号。
+- 在中国大陆，**一个百炼 key 就够了**：文字选「阿里云百炼（千问）」（`TEXT_PROVIDER=qwen`），语音选「阿里云百炼」（`VOICE_PROVIDER=qwen`），不需要 Google 账号。
 
 检查是否填好时只看变量名，例如 `cut -d= -f1 .env`，不要输出值。
 

@@ -12,7 +12,8 @@ export function createSettings({ onSaved = () => {} } = {}) {
   // Only the boxes the chosen services need are shown.
   function fit() {
     const text = picked('TEXT_PROVIDER'), voice = picked('VOICE_PROVIDER');
-    const need = { gemini: text === 'gemini' || voice === 'gemini', deepseek: text === 'deepseek', qwen: voice === 'qwen' };
+    // One Model Studio key serves both Qwen text and Qwen voice.
+    const need = { gemini: text === 'gemini' || voice === 'gemini', deepseek: text === 'deepseek', qwen: voice === 'qwen' || text === 'qwen' };
     for (const field of form.querySelectorAll('[data-need]')) field.hidden = !need[field.dataset.need];
     $('dashscope-link').href = $('DASHSCOPE_REGION').value === 'ap-southeast-1'
       ? 'https://modelstudio.console.alibabacloud.com/' : 'https://bailian.console.aliyun.com/cn-beijing/model/settings/api-key';

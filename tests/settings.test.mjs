@@ -61,3 +61,22 @@ test('testing the services: text by listing models, Qwen voice by its greeting',
   const quiet = await testServices({ ...cfg, voiceProvider: 'none' }, { request, connect: greeted });
   assert.deepEqual(quiet.voice, { ok: true, message: '不用语音' });
 });
+
+test('Qwen text: strict schema on the Model Studio chat endpoint, thinking off, translation on the cheaper model', async () => {
+  const { textJSON } = await import('../server/llm.mjs');
+  const cfg = config({ TEXT_PROVIDER: 'qwen', DASHSCOPE_API_KEY: 'k', DASHSCOPE_REGION: 'cn-beijing' });
+  const sent = [];
+  const request = async (url, init) => { sent.push({ url, auth: init.headers.Authorization, body: JSON.parse(init.body) });
+    return { ok: true, json: async () => ({ model: JSON.parse(init.body).model, choices: [{ finish_reason: 'stop', message: { content: '{"verdict":"pass"}' } }], usage: { prompt_tokens: 5, completion_tokens: 2 } }) }; };
+  const schema = { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false };
+  const out = await textJSON({ a: 1 }, cfg, { instructions: '检查', schema, purpose: 'check' }, request);
+  assert.deepEqual(out.value, { verdict: 'pass' });
+  assert.equal(sent[0].url, 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions');
+  assert.equal(sent[0].auth, 'Bearer k');
+  assert.equal(sent[0].body.model, 'qwen3.8-max');
+  assert.equal(sent[0].body.response_format.type, 'json_schema');
+  assert.equal(sent[0].body.response_format.json_schema.strict, true);
+  assert.equal(sent[0].body.enable_thinking, false);
+  await textJSON({ a: 1 }, cfg, { instructions: '翻译', schema, purpose: 'translate', cheap: true }, request);
+  assert.equal(sent[1].body.model, 'qwen3.8-flash');
+});

@@ -17,7 +17,15 @@ export function config(env = process.env) {
   if (!/^[a-zA-Z0-9.-]{1,100}$/.test(geminiTranslateModel)) throw new Error('Invalid GEMINI_TRANSLATE_MODEL');
   // Who answers the text calls; voice stays on Gemini Live either way.
   const textProvider = env.TEXT_PROVIDER?.trim().toLowerCase() || 'gemini';
-  if (!['gemini', 'deepseek'].includes(textProvider)) throw new Error('Invalid TEXT_PROVIDER');
+  if (!['gemini', 'deepseek', 'qwen'].includes(textProvider)) throw new Error('Invalid TEXT_PROVIDER');
+  // Qwen text runs on the same Model Studio key and region as the Qwen voice. Without thinking, flash translated
+  // well but stated wrong mathematics in a check ("numbers above 4 already include the even ones") and in a
+  // review ("joint probability"); max caught the learner's real mistake and was quick (2026-09-26). So anything
+  // that judges mathematics — blocks, checks, reviews — goes to max, and only translating to flash.
+  const qwenTextModel = env.QWEN_TEXT_MODEL?.trim() || 'qwen3.8-max', qwenTranslateModel = env.QWEN_TRANSLATE_MODEL?.trim() || 'qwen3.8-flash';
+  for (const m of [qwenTextModel, qwenTranslateModel]) if (!/^[a-zA-Z0-9.-]{1,100}$/.test(m)) throw new Error('Invalid QWEN_TEXT_MODEL');
+  // Thinking first made a check take 9–14 s and a preparation over a minute (measured 2026-09-26), so it is off unless asked for.
+  const qwenThinking = (env.QWEN_THINKING?.trim().toLowerCase() || 'off') === 'on';
   const deepseekModel = env.DEEPSEEK_MODEL?.trim() || 'deepseek-flash', deepseekTranslateModel = env.DEEPSEEK_TRANSLATE_MODEL?.trim() || deepseekModel;
   for (const m of [deepseekModel, deepseekTranslateModel]) if (!/^[a-zA-Z0-9.-]{1,100}$/.test(m)) throw new Error('Invalid DEEPSEEK_MODEL');
   const geminiThinkingLevel = (env.GEMINI_THINKING_LEVEL ?? 'low').trim().toLowerCase();
@@ -42,7 +50,7 @@ export function config(env = process.env) {
     port,
     textProvider, deepseekKey: env.DEEPSEEK_API_KEY?.trim() || '', deepseekModel, deepseekTranslateModel,
     geminiKey: env.GEMINI_API_KEY?.trim() || '', geminiModel, geminiTranslateModel, geminiThinkingLevel, geminiLiveModel, voiceThinkingLevel,
-    voiceProvider, dashscopeKey: env.DASHSCOPE_API_KEY?.trim() || '', dashscopeRegion, dashscopeWorkspace, qwenRealtimeModel, qwenVoice,
+    voiceProvider, qwenTextModel, qwenTranslateModel, qwenThinking, dashscopeKey: env.DASHSCOPE_API_KEY?.trim() || '', dashscopeRegion, dashscopeWorkspace, qwenRealtimeModel, qwenVoice,
     geminiTimeout: number('GEMINI_TIMEOUT_MS', 30000, 100, 120000),
     geminiPreparationTimeout: number('GEMINI_PREPARATION_TIMEOUT_MS', 60000, 100, 180000),
     voiceMaxSeconds: number('VOICE_MAX_SECONDS', 600, 30, 3600),
