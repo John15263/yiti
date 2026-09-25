@@ -1,6 +1,12 @@
 {
   "name": "yiti",
   "version": "0.1.0",
+  "description": "跟着 Math Academy 学的中文陪练（本地运行）",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/John15263/yiti.git"
+  },
   "private": true,
   "type": "module",
   "engines": {

@@ -18,7 +18,8 @@ function fromBase64(value) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
-const money = value => !value ? '$0' : value < 0.001 ? '< $0.001' : `$${value.toFixed(3)}`;
+// null: a service whose price is not known here; its usage is kept in tokens, never guessed.
+const money = value => value === null ? '费用见服务商控制台' : !value ? '$0' : value < 0.001 ? '< $0.001' : `$${value.toFixed(3)}`;
 
 export function createVoice({ getRecord, draftOf, available = () => true }) {
   const $ = id => document.getElementById(id);
@@ -135,13 +136,12 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
       if (message.voice === 'error') { status = message.message; paint(); return; }
       if (message.voice === 'usage') { usd = message.usd; paint(); return; }
       if (message.voice === 'closed') { status = message.reason; stop(false); return; }
-      const content = message.serverContent;
-      if (!content) return;
-      if (content.interrupted) silence();
-      for (const part of content.modelTurn?.parts || []) if (part.inlineData?.data) play(part.inlineData.data);
-      if (content.inputTranscription?.text) note('user', content.inputTranscription.text);
-      if (content.outputTranscription?.text) note('tutor', content.outputTranscription.text);
-      if (content.turnComplete) for (const line of lines) line.done = true;
+      // The same few events whichever service is speaking; the server translates.
+      if (message.voice === 'audio') play(message.data);
+      else if (message.voice === 'interrupted') silence();
+      else if (message.voice === 'heard') note('user', message.text);
+      else if (message.voice === 'said') note('tutor', message.text);
+      else if (message.voice === 'turn') for (const line of lines) line.done = true;
     };
     ws.onerror = () => { if (socket === ws) status = '语音连接出错，已结束。'; };
     ws.onclose = () => { if (socket === ws && live) { status = status || '语音已结束。'; stop(false); } };
@@ -156,7 +156,7 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
   function stop(closeSocket = true) {
     generation++;
     if (!live && !socket) return;
-    if (live && sessionID) status = `${status || '语音已结束。'} 用时 ${elapsed()} · 实际花费 ${money(usd)}`;
+    if (live && sessionID) status = `${status || '语音已结束。'} 用时 ${elapsed()} · ${usd === null ? money(usd) : `实际花费 ${money(usd)}`}`;
     live = false;
     // What was just said stays on screen until the recorded copy of it arrives.
     if (sessionID && lines.length) ended = { id: sessionID, key: modeKey, heading, lines };

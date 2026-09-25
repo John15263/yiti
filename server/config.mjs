@@ -25,12 +25,24 @@ export function config(env = process.env) {
   // Live models answer only on bidiGenerateContent, so they are named separately from the text model.
   const geminiLiveModel = env.GEMINI_LIVE_MODEL?.trim() || 'gemini-3.8-live-extended-thinking';
   if (!/^[a-zA-Z0-9.-]{1,100}$/.test(geminiLiveModel)) throw new Error('Invalid GEMINI_LIVE_MODEL');
+  // Who speaks in the voice tutor: Gemini Live, or Qwen-Omni-Realtime on Alibaba Cloud Model Studio (百炼).
+  const voiceProvider = env.VOICE_PROVIDER?.trim().toLowerCase() || 'gemini';
+  if (!['gemini', 'qwen'].includes(voiceProvider)) throw new Error('Invalid VOICE_PROVIDER');
+  const dashscopeRegion = env.DASHSCOPE_REGION?.trim() || 'cn-beijing';
+  if (!['cn-beijing', 'ap-southeast-1'].includes(dashscopeRegion)) throw new Error('Invalid DASHSCOPE_REGION');
+  const dashscopeWorkspace = env.DASHSCOPE_WORKSPACE_ID?.trim() || '';
+  if (dashscopeWorkspace && !/^[A-Za-z0-9-]{1,64}$/.test(dashscopeWorkspace)) throw new Error('Invalid DASHSCOPE_WORKSPACE_ID');
+  const qwenRealtimeModel = env.QWEN_REALTIME_MODEL?.trim() || 'qwen3.8-omni-flash-realtime';
+  if (!/^[a-zA-Z0-9.-]{1,100}$/.test(qwenRealtimeModel)) throw new Error('Invalid QWEN_REALTIME_MODEL');
+  const qwenVoice = env.QWEN_VOICE?.trim() || 'longanlingxin';
+  if (!/^[A-Za-z][\w-]{0,40}$/.test(qwenVoice)) throw new Error('Invalid QWEN_VOICE');
   const voiceThinkingLevel = (env.VOICE_THINKING_LEVEL?.trim() || 'LOW').toUpperCase();
   if (!['LOW', 'MEDIUM', 'HIGH'].includes(voiceThinkingLevel)) throw new Error('Invalid VOICE_THINKING_LEVEL');
   return {
     port,
     textProvider, deepseekKey: env.DEEPSEEK_API_KEY?.trim() || '', deepseekModel, deepseekTranslateModel,
     geminiKey: env.GEMINI_API_KEY?.trim() || '', geminiModel, geminiTranslateModel, geminiThinkingLevel, geminiLiveModel, voiceThinkingLevel,
+    voiceProvider, dashscopeKey: env.DASHSCOPE_API_KEY?.trim() || '', dashscopeRegion, dashscopeWorkspace, qwenRealtimeModel, qwenVoice,
     geminiTimeout: number('GEMINI_TIMEOUT_MS', 30000, 100, 120000),
     geminiPreparationTimeout: number('GEMINI_PREPARATION_TIMEOUT_MS', 60000, 100, 180000),
     voiceMaxSeconds: number('VOICE_MAX_SECONDS', 600, 30, 3600),

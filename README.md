@@ -10,7 +10,10 @@
 
 - Node.js 24 或更新（不需要 `npm install`，没有第三方依赖）
 - Chrome（或其他 Chromium 浏览器）
-- 一个 [Gemini API key](https://aistudio.google.com/apikey)。文字部分（翻译、拆块、检查、点评）也可以改用 DeepSeek；语音陪练目前只支持 Gemini Live。
+- 模型的 API key，两部分可以分别选：
+  - 文字部分（翻译、拆块、检查、点评）：[Gemini](https://aistudio.google.com/apikey) 或 [DeepSeek](https://platform.deepseek.com)。
+  - 语音陪练：Gemini Live，或阿里云百炼的 Qwen-Omni-Realtime（**实验性**，中国大陆可用）。不配语音也能用，只是没有语音按钮。
+  - 在中国大陆，用 DeepSeek + 百炼就能不依赖 Google 跑全套。
 
 ## 安装
 
@@ -53,14 +56,17 @@ npm start               # 打开 http://127.0.0.1:4318
 | `TEXT_PROVIDER` | 文字部分用 `gemini`（默认）还是 `deepseek` |
 | `DEEPSEEK_API_KEY` | `TEXT_PROVIDER=deepseek` 时需要 |
 | `GEMINI_MODEL` / `GEMINI_TRANSLATE_MODEL` | 文字模型；翻译默认用更便宜的 flash-lite |
+| `VOICE_PROVIDER` | 语音用 `gemini`（默认）还是 `qwen` |
+| `DASHSCOPE_API_KEY` / `DASHSCOPE_REGION` / `DASHSCOPE_WORKSPACE_ID` | `VOICE_PROVIDER=qwen` 时需要；key 按区域分开 |
+| `QWEN_REALTIME_MODEL` / `QWEN_VOICE` | Qwen 的实时模型和音色 |
 | `YITI_PORT` | 端口，默认 4318（改了要同时改扩展 `manifest.json` 和 `background.js` 里的地址） |
 
-每次模型调用的用量和按官方价格算出的花费记在本地数据库，`/api/usage` 可以查看。实测一小时大约 $0.1，八成以上是语音。
+每次模型调用的用量和按官方价格算出的花费记在本地数据库，`/api/usage` 可以查看。用 Gemini 实测一小时大约 $0.1，八成以上是语音。Qwen 语音只记 token 数、不估算金额（它的价格这里没有可靠来源），实际费用看百炼控制台。
 
 ## 文件
 
 - `extension/`：Chrome 扩展。`extract.js` 在 Math Academy 页面里读当前步骤（公式取 TeX，并用页面自带的 MathJax 转成 MathML），`relay.js` 和 `background.js` 转交给本机。
-- `server/`：本机服务，只监听 127.0.0.1。`board.mjs` 跟踪当前步骤和每一步的进度；`teach.mjs` 是文字调用（拆块、翻译、检查、点评），`llm.mjs` 选 Gemini 或 DeepSeek；`translate.mjs` 保证翻译时公式原样保留；`voice.mjs` 是语音中继（key 只在服务端）。
+- `server/`：本机服务，只监听 127.0.0.1。`board.mjs` 跟踪当前步骤和每一步的进度；`teach.mjs` 是文字调用（拆块、翻译、检查、点评），`llm.mjs` 选 Gemini 或 DeepSeek；`translate.mjs` 保证翻译时公式原样保留；`voice.mjs` 是语音中继（key 只在服务端），`voice-providers.mjs` 把 Gemini Live 和 Qwen-Omni-Realtime 各自的协议翻译成同一组事件。
 - `prompts/`：提示词。
 - `web/`：页面。公式用浏览器原生 MathML 显示，按白名单重建，不插入原始 HTML。
 - `data/`：本地数据库和 token，不提交。
@@ -68,3 +74,7 @@ npm start               # 打开 http://127.0.0.1:4318
 ```sh
 npm test
 ```
+
+## 许可证
+
+[GNU AGPL-3.0](LICENSE)（或更新版本）。可以自由使用、修改和分发；如果你修改后通过网络向别人提供服务，也要以同样的许可证公开你的源代码。

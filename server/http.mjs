@@ -9,6 +9,7 @@ import { Voice } from './voice.mjs';
 import { Usage } from './usage.mjs';
 import { accept } from './ws.mjs';
 import { textConfigured } from './llm.mjs';
+import { voiceConfigured } from './voice-providers.mjs';
 
 // Captures come from the extension, or from a Math Academy page itself; no other site can name these origins.
 const CAPTURE_ORIGIN = /^(chrome-extension:\/\/[a-p]{32}|https:\/\/(www\.)?mathacademy\.com)$/;
@@ -22,7 +23,7 @@ export function createServer({ store, cfg, webRoot, token = randomBytes(32).toSt
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();
-  const view = () => ({ ...board.state(), gemini: textConfigured(cfg), voice: Boolean(cfg.geminiKey), build });
+  const view = () => ({ ...board.state(), gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build });
   const publish = () => { const data = `event: state\ndata: ${JSON.stringify(view())}\n\n`; for (const res of streams) res.write(data); };
   const board = new Board(store, publish);
   const teach = new Teach(board, cfg, infer);

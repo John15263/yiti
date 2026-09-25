@@ -15,8 +15,10 @@ cp .env.example .env
 
 请用户**自己**把 key 填进 `.env`（打开文件让他们粘贴），不要让用户把 key 发到对话里，也不要把 key 打印出来：
 
-- `GEMINI_API_KEY`：必填，文字部分和语音陪练都用它。在 https://aistudio.google.com/apikey 申请。
-- 只有 DeepSeek key 的话：填 `DEEPSEEK_API_KEY`，把 `TEXT_PROVIDER` 改成 `deepseek`。这样翻译、拆块、检查、点评都能用，但语音陪练需要 Gemini key，没有时语音按钮不会出现。
+- `GEMINI_API_KEY`：默认配置下文字部分和语音陪练都用它，在 https://aistudio.google.com/apikey 申请。用不了 Google 的话可以不填，按下面两条换成国内服务。
+- 只有 DeepSeek key 的话：填 `DEEPSEEK_API_KEY`，把 `TEXT_PROVIDER` 改成 `deepseek`。翻译、拆块、检查、点评都能用。
+- 语音陪练：默认 Gemini Live（用 `GEMINI_API_KEY`）。在中国大陆，改用阿里云百炼：`VOICE_PROVIDER=qwen`，填 `DASHSCOPE_API_KEY`，`DASHSCOPE_REGION` 选 `cn-beijing`（中国大陆的 key）或 `ap-southeast-1`（国际的 key），有工作空间 ID 就填 `DASHSCOPE_WORKSPACE_ID`。语音没配好时语音按钮不会出现，其余功能照常。
+- 所以在中国大陆，DeepSeek + 百炼两个 key 就能跑全套，不需要 Google 账号。
 
 检查是否填好时只看变量名，例如 `cut -d= -f1 .env`，不要输出值。
 
@@ -24,7 +26,7 @@ cp .env.example .env
 
 ```sh
 npm test      # 应该全部通过
-npm start     # 日志里会写 Text: … 和 Voice: …，确认用的是哪个服务商
+npm start     # 日志里的 Text: … 和 Voice: … 写着用的是哪个服务商、key 有没有配上
 ```
 
 `curl -s http://127.0.0.1:4318/api/health` 返回 `{"service":"yiti",…}` 就是起来了。让用户在浏览器打开 http://127.0.0.1:4318。
