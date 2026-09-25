@@ -50,10 +50,12 @@ test('Qwen-Omni-Realtime: set up with the key in a header, and read back as the 
   up.push({ type: 'response.audio_transcript.delta', delta: '关键一步。' });
   up.push({ type: 'input_audio_buffer.speech_started' });
   up.push({ type: 'conversation.item.input_audio_transcription.completed', transcript: '为什么乘以 50？' });
-  up.push({ type: 'response.done', response: { usage: { input_tokens: 80, output_tokens: 45, input_token_details: { audio_tokens: 70 }, output_token_details: { audio_tokens: 40 } } } });
+  // Field names as the service actually sends them (plural "tokens"), not as documented.
+  up.push({ type: 'response.done', response: { usage: { input_tokens: 80, output_tokens: 45, input_tokens_details: { text_tokens: 10, audio_tokens: 70 }, output_tokens_details: { text_tokens: 5, audio_tokens: 40 } } } });
   assert.deepEqual(events(page), ['audio', 'said', 'said', 'interrupted', 'heard', 'turn']);
   assert.equal(page.find(m => m.voice === 'audio').data, 'UklG');
   assert.equal(metered[0].usage.promptTokensDetails[0].tokenCount, 70);
+  assert.equal(metered[0].usage.candidatesTokensDetails[0].tokenCount, 40);
   // A price not known here is never shown as $0.
   assert.equal(page.find(m => m.voice === 'usage').usd, null);
   on.close();

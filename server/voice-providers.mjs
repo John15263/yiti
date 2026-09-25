@@ -7,7 +7,7 @@
 const GEMINI_LIVE = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
 
 const gemini = {
-  name: 'Gemini Live',
+  name: 'Google Gemini Live',
   configured: cfg => Boolean(cfg.geminiKey),
   missing: 'GEMINI_API_KEY',
   model: cfg => cfg.geminiLiveModel,
@@ -42,13 +42,15 @@ function qwenURL(cfg) {
   return `wss://${cfg.dashscopeRegion === 'cn-beijing' ? 'dashscope' : 'dashscope-intl'}.aliyuncs.com/api-ws/v1/realtime?model=${model}`;
 }
 const said = text => ({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } });
-// Its usage is in OpenAI's shape; metering reads Gemini's.
+// Its usage is in OpenAI's shape; metering reads Gemini's. The service sends input_tokens_details and
+// output_tokens_details (seen 2026-09-25), where its documentation says input_token_details; both are read.
+const details = (u, side) => u[`${side}_tokens_details`] || u[`${side}_token_details`] || {};
 const qwenUsage = u => u && { promptTokenCount: u.input_tokens, candidatesTokenCount: u.output_tokens,
-  promptTokensDetails: [{ modality: 'AUDIO', tokenCount: u.input_token_details?.audio_tokens || 0 }],
-  candidatesTokensDetails: [{ modality: 'AUDIO', tokenCount: u.output_token_details?.audio_tokens || 0 }] };
+  promptTokensDetails: [{ modality: 'AUDIO', tokenCount: details(u, 'input').audio_tokens || 0 }],
+  candidatesTokensDetails: [{ modality: 'AUDIO', tokenCount: details(u, 'output').audio_tokens || 0 }] };
 
 const qwen = {
-  name: 'Qwen-Omni-Realtime',
+  name: '阿里云百炼的千问 Qwen-Omni-Realtime',
   configured: cfg => Boolean(cfg.dashscopeKey),
   missing: 'DASHSCOPE_API_KEY',
   model: cfg => cfg.qwenRealtimeModel,

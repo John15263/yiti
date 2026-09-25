@@ -130,7 +130,8 @@ export class Voice {
     // What this lesson teaches, from its tutorials and examples already followed: new material is not a prerequisite.
     const lesson = mode.mode === 'prereq' ? this.board.store.steps()
       .filter(r => r.task === rec.task && ['tutorial', 'example'].includes(r.step.type) && r.title).sort((a, b) => a.step.index - b.step.index).map(r => r.title) : [];
-    const system = `${INSTRUCTIONS[mode.mode]}\n\n当前的上下文（数据）：\n${JSON.stringify(contextOf(rec, mode, lesson), null, 1)}`;
+    // Asked what it is, it should know: 一题's tutor, speaking through whichever service is set.
+    const system = `${INSTRUCTIONS[mode.mode]}\n\n你是「一题」的语音陪练，语音由 ${provider.name} 提供。\n\n当前的上下文（数据）：\n${JSON.stringify(contextOf(rec, mode, lesson), null, 1)}`;
     const session = { id: randomUUID(), key: rec.key, mode: mode.mode, mode_key: mode.key, index: mode.index ?? null, model,
       started: Date.now(), transcript: [], turns: 0, draft: '', usd: 0, priced: true, tokens: { text_in: 0, audio_in: 0, text_out: 0, audio_out: 0, thoughts: 0 } };
     this.sessions.add(session);

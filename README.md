@@ -14,7 +14,7 @@
 - Chrome（或其他 Chromium 浏览器）
 - 模型的 API key，两部分可以分别选：
   - 文字部分（翻译、拆块、检查、点评）：[Gemini](https://aistudio.google.com/apikey) 或 [DeepSeek](https://platform.deepseek.com)。
-  - 语音陪练：Gemini Live，或阿里云百炼的 Qwen-Omni-Realtime（**实验性**，中国大陆可用）。不配语音也能用，只是没有语音按钮。
+  - 语音陪练：Gemini Live，或阿里云百炼的 Qwen-Omni-Realtime（中国大陆可用，实测中文讲解很自然）。不配语音也能用，只是没有语音按钮。
   - 在中国大陆，用 DeepSeek + 百炼就能不依赖 Google 跑全套。
 
 ## 安装
