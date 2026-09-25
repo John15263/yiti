@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>一题</title>
-  <link rel="stylesheet" href="/app.css"><script type="module" src="/app.js"></script>
+  <link rel="stylesheet" href="app.css"><script type="module" src="app.js"></script>
 </head>
 <body>
   <!-- 一行顶栏：在哪一步，和两个随手的开关（中英、语音）。 -->
@@ -20,7 +20,10 @@
     <section id="waiting" hidden>
       <h1>打开 Math Academy 的一节课，这里会跟到你正在看的那一步。</h1>
       <p id="needs-key" class="meaning" hidden>还没有能用的 API key：点右上角「设置」填一个。</p>
+      <!-- local-only -->
       <p class="muted">第一次用要在 Chrome 装「一题」扩展：chrome://extensions → 开发者模式 → 加载已解压的扩展程序 → 选一题仓库里的 <code>extension</code> 文件夹，再刷新 Math Academy。</p>
+      <!-- /local-only -->
+      <!-- edge: <p class="muted">侧边栏开着时，一题跟着当前窗口里的 Math Academy 走。刚装好的话，先刷新一下 Math Academy 的页面。</p> -->
     </section>
 
     <section id="elsewhere" hidden>
@@ -89,7 +92,7 @@
   <dialog id="settings">
     <form id="settings-form">
       <h2>设置</h2>
-      <p class="muted">key 只存在这台电脑上（<code>data/settings.json</code>），保存后只显示末尾四位；只会发给对应的服务商。这里的设置优先于 <code>.env</code>。</p>
+      <p class="muted">key 只存在这台电脑上<!-- local-only -->（<code>data/settings.json</code>）<!-- /local-only --><!-- edge: （浏览器的插件存储） -->，保存后只显示末尾四位；只会发给对应的服务商。<!-- local-only -->这里的设置优先于 <code>.env</code>。<!-- /local-only --></p>
 
       <h3>文字 <span class="muted">翻译、拆块、检查、点评</span></h3>
       <div class="choice">

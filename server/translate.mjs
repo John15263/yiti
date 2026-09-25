@@ -29,17 +29,34 @@ function formula(part, dict) {
   if (mml) mml = mml.replace(MTEXT, (all, attrs, words) => dict.has(words.trim()) ? `<mtext${attrs}>${escape(dict.get(words.trim()))}</mtext>` : all);
   return { ...part, tex, ...(mml ? { mml } : {}) };
 }
-// Math Academy often writes the sentence's full stop inside an inline formula ("12."). A Chinese sentence
-// brings its own punctuation, so the formula's is dropped when Chinese punctuation follows it.
+// Math Academy often writes the sentence's punctuation inside an inline formula ("12.", "2?"). In Chinese the
+// words move around the formula and the sentence brings its own punctuation, so the formula's is dropped.
+const TRAILING = /[.,?!;:]$/;
 function unstop(part) {
-  if (part.display || !/[.,]$/.test(part.tex)) return part;
-  const mml = part.mml?.replace(/<mo>[.,]<\/mo>(<\/math>)$/, '$1').replace(/<mn>([^<]*?)[.,]<\/mn>(<\/math>)$/, '<mn>$1</mn>$2');
-  return { ...part, tex: part.tex.replace(/[.,]$/, '').trimEnd(), ...(mml ? { mml } : {}) };
+  if (part.display || !TRAILING.test(part.tex)) return part;
+  const mml = part.mml?.replace(/<mo[^>]*>[.,?!;:]<\/mo>(<\/math>)$/, '$1').replace(/<mn>([^<]*?)[.,]<\/mn>(<\/math>)$/, '<mn>$1</mn>$2');
+  return { ...part, tex: part.tex.replace(TRAILING, '').trimEnd(), ...(mml ? { mml } : {}) };
+}
+
+// "…a multiple of ⟦2⟧?" ends its sentence with the question mark; models keep putting it straight after the
+// marker even when Chinese word order puts more words there ("⟦2⟧？的倍数"). The prompt asks them not to; this
+// moves it to the end of the sentence when they do anyway.
+function endQuestion(para, text) {
+  for (const [k, part] of para.entries()) {
+    if (part.t !== 'math' || !/^\s*\?/.test(para[k + 1]?.v || '')) continue;
+    const at = text.search(new RegExp(`⟦${k}⟧\\s*[？?](?=\\s*[^\\s。？！?!])`));
+    if (at < 0) continue;
+    const mark = `⟦${k}⟧`;
+    text = text.slice(0, at) + mark + text.slice(at + mark.length).replace(/^\s*[？?]/, '');
+    text = /[？?]\s*$/.test(text) ? text : /[。.]\s*$/.test(text) ? text.replace(/[。.]\s*$/, '？') : `${text}？`;
+  }
+  return text;
 }
 
 // The translated text split back at its markers. Every formula must come back exactly once, or the
 // paragraph is kept in English rather than shown with a formula missing or doubled.
 function rebuild(para, text, dict) {
+  text = endQuestion(para, text);
   const maths = new Map(para.map((p, k) => [k, p]).filter(([, p]) => p.t === 'math'));
   const out = [], used = new Set();
   let at = 0;
@@ -50,7 +67,7 @@ function rebuild(para, text, dict) {
     out.push(formula(maths.get(k), dict)); used.add(k); at = m.index + m[0].length;
   }
   if (at < text.length) out.push({ t: 'text', v: text.slice(at) });
-  for (const [j, part] of out.entries()) if (part.t === 'math' && /^\s*[。，、；：？！]/.test(out[j + 1]?.v || '')) out[j] = unstop(part);
+  for (const [j, part] of out.entries()) if (part.t === 'math') out[j] = unstop(part);
   return used.size === maths.size ? out : null;
 }
 

@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { changeRows, check, fields, text } from './validation.mjs';
 import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
 import { paraText, parasText } from './capture.mjs';
@@ -8,7 +6,13 @@ import { plan, apply } from './translate.mjs';
 import { learnable, learnParas, blockParas } from '../web/mode.js';
 
 const now = () => new Date().toISOString();
-export const prompt = name => readFileSync(new URL(`../prompts/${name}.txt`, import.meta.url), 'utf8');
+// The prompt texts, handed in by whoever runs this: read from prompts/ by the local server, bundled by the extension.
+const PROMPTS = new Map();
+export function usePrompts(texts) { for (const [name, value] of Object.entries(texts)) PROMPTS.set(name, value); }
+export function prompt(name) {
+  if (!PROMPTS.has(name)) throw new Error(`Prompt not loaded: ${name}`);
+  return PROMPTS.get(name);
+}
 const str = { type: 'string' };
 export const SCHEMAS = {
   prepare: { type: 'object', additionalProperties: false, required: ['summary', 'blocks'], properties: { summary: str,
@@ -139,7 +143,7 @@ export class Teach {
     const input = p.inputs[p.index], block = rec.prep.blocks[p.index];
     check(!input.attempts.some(a => a.status === 'running'), '正在检查，稍等。', 409);
     check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
-    const attempt = { id: randomUUID(), text: body.text.trim(), at: now(), status: 'running', hints: input.hints, peeks: input.peeks };
+    const attempt = { id: crypto.randomUUID(), text: body.text.trim(), at: now(), status: 'running', hints: input.hints, peeks: input.peeks };
     input.attempts.push(attempt); p.phase = 'write';
     this.board.save(rec);
     const packet = checkPacket(rec, block, attempt.text);
@@ -172,7 +176,7 @@ export class Teach {
     check(rec.step.type === 'question' && rec.sections.result, '先在 Math Academy 交了答案，再来说这一句。', 409);
     check(!rec.say.attempts.some(a => a.status === 'running'), '正在点评，稍等。', 409);
     check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
-    const attempt = { id: randomUUID(), text: body.text.trim(), at: now(), status: 'running' };
+    const attempt = { id: crypto.randomUUID(), text: body.text.trim(), at: now(), status: 'running' };
     rec.say.attempts.push(attempt);
     this.board.save(rec);
     const packet = sayPacket(rec, attempt.text);

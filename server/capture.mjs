@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { check } from './validation.mjs';
 
 // What the extension reads off Math Academy, checked and trimmed before anything keeps it.
@@ -58,10 +57,21 @@ export function normalize(input) {
 // A question counts as answered once Math Academy shows its verdict.
 export const answered = sections => !!sections?.result;
 
+// A 64-bit string hash (cyrb53, public domain), in plain JavaScript so the browser extension computes the
+// same fingerprints as the local server. It only tells content apart; it is not for security.
+function digest(text) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
 // The content a preparation was made from; the MathML is only how it looks, so it is left out.
 export function fingerprint(sections) {
-  const plain = JSON.stringify(sections, (k, v) => k === 'mml' ? undefined : v);
-  return createHash('sha256').update(plain).digest('hex').slice(0, 16);
+  return digest(JSON.stringify(sections, (k, v) => k === 'mml' ? undefined : v));
 }
 
 // Only the words that get translated: picking a choice or getting the verdict changes nothing here.

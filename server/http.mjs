@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { check, HttpError } from './validation.mjs';
 import { Board } from './board.mjs';
 import { Teach } from './teach.mjs';
+import './prompts-node.mjs';
 import { Voice } from './voice.mjs';
 import { Usage } from './usage.mjs';
 import { accept } from './ws.mjs';
@@ -16,12 +17,12 @@ import { voiceConfigured } from './voice-providers.mjs';
 // Captures come from the extension, or from a Math Academy page itself; no other site can name these origins.
 const CAPTURE_ORIGIN = /^(chrome-extension:\/\/[a-p]{32}|https:\/\/(www\.)?mathacademy\.com)$/;
 
-export function createServer({ store, cfg, settings = new Settings(null), webRoot, token = randomBytes(32).toString('hex'), infer, connect }) {
+export function createServer({ store, cfg, settings = new Settings(), webRoot, token = randomBytes(32).toString('hex'), infer, connect }) {
   const streams = new Set();
   const usage = new Usage(store); cfg = { ...cfg, usage };
   const files = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.css', ['app.css', 'text/css; charset=utf-8']],
-    ...['app.js', 'math.js', 'mode.js', 'voice.js', 'voice-worklet.js', 'settings.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
+    ...['app.js', 'math.js', 'mode.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();

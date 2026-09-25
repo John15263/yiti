@@ -1,4 +1,5 @@
 import { voiceMode } from './mode.js';
+import { openVoice, microphoneDenied } from './backend.js';
 // Live voice tutor: the page carries the microphone, never the API key; the local server owns the prompt
 // and records what was said. The audio side is 一句's, unchanged.
 const OUTPUT_RATE = 24000;
@@ -41,7 +42,7 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
     $('voice-open').textContent = live ? `● ${elapsed()}` : '语音 ⌘]';
     $('voice-open').title = live ? '结束语音（⌘ ]）' : `${LABELS[m?.mode] || '语音陪练'}（⌘ ]）`;
     $('voice-open').classList.toggle('live', live);
-    const line = live ? `${!sessionID ? '正在连接…' : sources.size ? '陪练在讲' : '在听，你可以提问'} · ${money(usd)}` : status;
+    const line = live ? [!sessionID ? '正在连接…' : sources.size ? '陪练在讲' : '在听，你可以提问', usd === undefined ? '' : money(usd)].filter(Boolean).join(' · ') : status;
     $('voice-status').textContent = line; $('voice-status').hidden = !line;
     const past = (rec?.voice || []);
     if (ended && past.some(v => v.session_id === ended.id)) ended = null;
@@ -71,16 +72,19 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
     paint();
   }
   // The microphone and speakers of one start; closed on the spot if that start was abandoned meanwhile.
-  async function openAudio() {
+  // A call that carries audio itself ('track', WebRTC) only needs the microphone; one that relays it as PCM
+  // ('pcm') also needs the capture worklet and a player.
+  async function openAudio(transport) {
     const audio = { stream: await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } }) };
+    if (transport === 'track') return audio;
     try {
       audio.capture = new AudioContext({ sampleRate: 16000 });
       audio.playback = new AudioContext({ sampleRate: OUTPUT_RATE });
-      await audio.capture.audioWorklet.addModule('/voice-worklet.js');
+      await audio.capture.audioWorklet.addModule(new URL('./voice-worklet.js', import.meta.url));
       const source = audio.capture.createMediaStreamSource(audio.stream);
       const worklet = new AudioWorkletNode(audio.capture, 'voice-capture', { processorOptions: { target: 16000, chunk: 1600 } });
       worklet.port.onmessage = event => {
-        if (capture === audio.capture && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'audio', data: toBase64(event.data) }));
+        if (capture === audio.capture && socket?.ready()) socket.send({ type: 'audio', data: toBase64(event.data) });
       };
       source.connect(worklet);
       await Promise.race([Promise.all([audio.capture.resume(), audio.playback.resume()].map(p => p.catch(() => {}))), new Promise(r => setTimeout(r, 1500))]);
@@ -113,57 +117,58 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
     const rec = getRecord(), m = voiceMode(rec);
     if (live || !m || !available()) return;
     const run = ++generation;
-    live = true; lines = []; sentDraft = ''; usd = 0; startedAt = Date.now(); sessionID = '';
+    // Cost is shown once the service has reported some; before that there is nothing to show.
+    live = true; lines = []; sentDraft = ''; usd = undefined; startedAt = Date.now(); sessionID = '';
     modeKey = m.key; mode = m.mode; heading = headingOf(m.mode, m.index); status = ''; paint();
+    // Each call answers only for itself: an old one still closing must never end the call that replaced it.
+    let call = null;
+    const message = value => {
+      if (socket !== call) return;
+      if (value.voice === 'ready') { startedAt = Date.now(); sessionID = value.session || 'ready'; mine.add(sessionID); paint(); return; }
+      if (value.voice === 'error') { status = value.message; paint(); return; }
+      if (value.voice === 'usage') { usd = value.usd; paint(); return; }
+      if (value.voice === 'closed') { status = value.reason; stop(false); return; }
+      // The same few events whichever service is speaking; the engine translates.
+      if (value.voice === 'audio') play(value.data);
+      else if (value.voice === 'interrupted') silence();
+      else if (value.voice === 'heard') note('user', value.text);
+      else if (value.voice === 'said') note('tutor', value.text);
+      else if (value.voice === 'turn') for (const line of lines) line.done = true;
+    };
+    call = openVoice({ key: rec.key, mode: m.key }, { message,
+      error: () => { if (socket === call) status = '语音连接出错，已结束。'; },
+      close: () => { if (socket === call && live) { status = status || '语音已结束。'; stop(false); } } });
+    socket = call;
     let audio;
-    try { audio = await openAudio(); }
+    try { audio = await openAudio(call.transport); }
     catch (e) {
       if (run !== generation) return;
-      live = false;
-      status = e.name === 'NotAllowedError' ? '没有取得麦克风权限。在地址栏里允许麦克风后再试。'
+      status = e.name === 'NotAllowedError' ? microphoneDenied()
         : e.name === 'AudioBlocked' ? '浏览器没有允许播放声音，再按一次 ⌘ ]。' : '打不开麦克风，这次没有开始。';
-      paint(); return;
+      stop(); return;
     }
     if (run !== generation) { free(audio); return; }
     ({ stream, capture, playback } = audio); playHead = 0;
-    const ws = new WebSocket(`ws://${location.host}/api/voice?key=${encodeURIComponent(rec.key)}&mode=${encodeURIComponent(m.key)}`);
-    socket = ws;
-    ws.onmessage = event => {
-      if (socket !== ws) return;
-      let message;
-      try { message = JSON.parse(event.data); } catch { return; }
-      if (message.voice === 'ready') { startedAt = Date.now(); sessionID = message.session || 'ready'; mine.add(sessionID); paint(); return; }
-      if (message.voice === 'error') { status = message.message; paint(); return; }
-      if (message.voice === 'usage') { usd = message.usd; paint(); return; }
-      if (message.voice === 'closed') { status = message.reason; stop(false); return; }
-      // The same few events whichever service is speaking; the server translates.
-      if (message.voice === 'audio') play(message.data);
-      else if (message.voice === 'interrupted') silence();
-      else if (message.voice === 'heard') note('user', message.text);
-      else if (message.voice === 'said') note('tutor', message.text);
-      else if (message.voice === 'turn') for (const line of lines) line.done = true;
-    };
-    ws.onerror = () => { if (socket === ws) status = '语音连接出错，已结束。'; };
-    ws.onclose = () => { if (socket === ws && live) { status = status || '语音已结束。'; stop(false); } };
+    if (call.transport === 'track') call.useMicrophone(stream);
     ticker = setInterval(() => { if (!live) return; paint(); sendDraft(); }, 1000);
   }
   function sendDraft() {
     if (mode !== 'write') return;
     const value = draftOf();
-    if (value === sentDraft || socket?.readyState !== WebSocket.OPEN) return;
-    sentDraft = value; socket.send(JSON.stringify({ type: 'draft', data: value }));
+    if (value === sentDraft || !socket?.ready()) return;
+    sentDraft = value; socket.send({ type: 'draft', data: value });
   }
   function stop(closeSocket = true) {
     generation++;
     if (!live && !socket) return;
-    if (live && sessionID) status = `${status || '语音已结束。'} 用时 ${elapsed()} · ${usd === null ? money(usd) : `实际花费 ${money(usd)}`}`;
+    if (live && sessionID) status = `${status || '语音已结束。'} 用时 ${elapsed()}${usd === undefined ? '' : usd === null ? ` · ${money(usd)}` : ` · 实际花费 ${money(usd)}`}`;
     live = false;
     // What was just said stays on screen until the recorded copy of it arrives.
     if (sessionID && lines.length) ended = { id: sessionID, key: modeKey, heading, lines };
     lines = []; sessionID = '';
     clearInterval(ticker); ticker = null;
-    const ws = socket; socket = null;
-    if (ws && closeSocket) { try { ws.close(); } catch {} }
+    const call = socket; socket = null;
+    if (call && closeSocket) call.close();
     silence(); free({ stream, capture, playback }); stream = null; capture = null; playback = null;
     paint();
   }

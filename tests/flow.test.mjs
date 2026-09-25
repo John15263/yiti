@@ -136,3 +136,18 @@ test('only the step being followed can be changed', async t => {
   assert.equal(body.current.page, 'quiz');
   assert.equal(body.record, null);
 });
+
+test('records fingerprinted with the old hash keep their preparation and translation', async () => {
+  const { Board } = await import('../server/board.mjs');
+  const { fingerprint, textFingerprint } = await import('../server/capture.mjs');
+  const store = new Store(':memory:');
+  const sections = { explanation: [[text('Multiply.')]] };
+  store.putStep({ key: '1-e2', task: '1', step: { id: 'e2', type: 'example', index: 0, total: 1 }, title: 'E', sections, hash: 'oldsha', text_hash: 'oldtext',
+    updated_at: 'x', prep: { status: 'ready', hash: 'oldsha', blocks: [{ start: 0, end: 1 }] }, translation: { status: 'ready', hash: 'oldtext' },
+    progress: { index: 0, phase: 'learn', inputs: [{ hints: 0, peeks: 0, skipped: false, passed: false, attempts: [] }] }, say: { attempts: [] }, voice: [] });
+  const rec = new Board(store).record('1-e2');
+  assert.equal(rec.hash, fingerprint(sections));
+  assert.equal(rec.prep.hash, rec.hash);
+  assert.equal(rec.prep.status, 'ready');
+  assert.equal(rec.translation.hash, textFingerprint(sections));
+});

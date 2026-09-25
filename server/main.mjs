@@ -1,16 +1,19 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { config, root } from './config.mjs';
+import { fileURLToPath } from 'node:url';
+import { config } from './config.mjs';
 import { Store } from './store.mjs';
 import { createServer } from './http.mjs';
 import { voiceProvider } from './voice-providers.mjs';
 import { Settings } from './settings.mjs';
+import { settingsFile } from './settings-file.mjs';
 
+const root = fileURLToPath(new URL('../', import.meta.url));
 process.umask(0o077);
 const data = join(root, 'data'); mkdirSync(data, { recursive: true, mode: 0o700 });
 // Keys and choices made on the settings page take precedence over .env.
-const settings = new Settings(join(data, 'settings.json'));
+const settings = new Settings(settingsFile(join(data, 'settings.json')));
 const cfg = config(settings.env());
 const tokenPath = join(data, '.local-token');
 if (!existsSync(tokenPath)) writeFileSync(tokenPath, randomBytes(32).toString('hex'), { mode: 0o600 });

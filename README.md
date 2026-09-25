@@ -8,6 +8,21 @@
 
 > 这是个人学习用的非官方工具，和 Math Academy 没有关联。扩展只在你自己的浏览器里读你自己打开的页面，内容只发到你本机运行的一题。
 
+## 两种用法
+
+- **浏览器插件版（推荐）**：装一个 Edge / Chrome 插件，一题就在浏览器侧边栏里跟着 Math Academy 走。不用装 Node，不用命令行；所有模型都由插件直接调用，不经过任何服务器。见下面「插件版」。
+- **本机服务版**：在电脑上跑一个 Node 服务，一题开在单独的标签页里，另装一个只负责读页面的小扩展。适合想改代码的人。
+
+## 插件版
+
+1. 构建插件（需要 Node 24）：`node edge/build.mjs`，生成 `dist/edge/` 文件夹和 `dist/yiti-edge-<版本>.zip`。拿到别人构建好的 zip 的话，解压就行，跳过这一步。
+2. Edge 打开 `edge://extensions`（Chrome 是 `chrome://extensions`），打开「开发人员模式」，点「加载解压缩的扩展」，选 `dist/edge` 文件夹。
+3. 点工具栏上一题的图标，侧边栏打开，会弹出「设置」：填 API key，点「保存并测试」。**在中国大陆，一个阿里云百炼的 key 就够了**：文字选「阿里云百炼（千问）」，语音选「阿里云百炼」，区域选中国大陆，并填上**业务空间 ID**（插件里的语音走 WebRTC，必须用业务空间的专属地址；在百炼控制台右上角能看到）。
+4. 打开或刷新 Math Academy 的一节课，侧边栏会跟到你正在看的那一步。
+5. 第一次按 ⌘] 开语音时，如果侧边栏没法直接要麦克风权限，一题会打开一个授权页，在那里允许一次就好。
+
+插件的学习记录和 key 都存在浏览器的插件存储里，只发给你选的服务商。
+
 ## 需要什么
 
 - Node.js 24 或更新（不需要 `npm install`，没有第三方依赖）
@@ -68,7 +83,8 @@ npm start               # 打开 http://127.0.0.1:4318
 
 ## 文件
 
-- `extension/`：Chrome 扩展。`extract.js` 在 Math Academy 页面里读当前步骤（公式取 TeX，并用页面自带的 MathJax 转成 MathML），`relay.js` 和 `background.js` 转交给本机。
+- `edge/`：浏览器插件版的专用部分：在侧边栏里跑引擎的 `backend.js`、浏览器存储 `store.js`、百炼语音的 WebRTC 连接 `rtc.js`，以及 `build.mjs`（把 `server/` 里能在浏览器跑的模块、`web/` 页面和提示词组装成插件）。
+- `extension/`：本机服务版用的小扩展（插件版也用同一份 `extract.js` 读页面）。`extract.js` 在 Math Academy 页面里读当前步骤（公式取 TeX，并用页面自带的 MathJax 转成 MathML），`relay.js` 和 `background.js` 转交给本机。
 - `server/`：本机服务，只监听 127.0.0.1。`board.mjs` 跟踪当前步骤和每一步的进度；`teach.mjs` 是文字调用（拆块、翻译、检查、点评），`llm.mjs` 选 Gemini 或 DeepSeek；`translate.mjs` 保证翻译时公式原样保留；`voice.mjs` 是语音中继（key 只在服务端），`voice-providers.mjs` 把 Gemini Live 和 Qwen-Omni-Realtime 各自的协议翻译成同一组事件。
 - `prompts/`：提示词。
 - `web/`：页面。公式用浏览器原生 MathML 显示，按白名单重建，不插入原始 HTML。

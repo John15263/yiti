@@ -1,6 +1,4 @@
-import { fileURLToPath } from 'node:url';
-
-export const root = fileURLToPath(new URL('../', import.meta.url));
+// Plain JavaScript: runs in Node for the local server and in the browser for the extension.
 export function config(env = process.env) {
   const number = (key, fallback, min, max) => {
     const n = Number(env[key] ?? fallback);

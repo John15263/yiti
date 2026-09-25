@@ -33,6 +33,19 @@ test('a full stop written inside a formula gives way to the Chinese one', () => 
   const formula = out.sections.question[0][1];
   assert.equal(formula.tex, '12');
   assert.equal(formula.mml, '<math><mn>12</mn></math>');
+  // Also mid-sentence, and a question mark: "…a multiple of $2?$" became "2? 的倍数".
+  const asked = { question: [[text('a multiple of '), { t: 'math', tex: '2?', display: false, mml: '<math><mn>2</mn><mo>?</mo></math>' }]] };
+  const mid = apply('Q', asked, { title: '', paragraphs: [{ id: 'question.0', text: '⟦1⟧ 的倍数上的次数。' }], phrases: [] }).sections.question[0][0];
+  assert.equal(mid.tex, '2');
+  assert.equal(mid.mml, '<math><mn>2</mn></math>');
+});
+
+test('a question mark stranded after a formula goes back to the end of the sentence', () => {
+  const para = { question: [[text('Which lands on a number greater than '), { t: 'math', tex: '4', display: false }, text(' or a multiple of '), { t: 'math', tex: '2', display: false }, text('?')]] };
+  const out = apply('Q', para, { title: '', paragraphs: [{ id: 'question.0', text: '指针停在大于 ⟦1⟧ 的数或 ⟦3⟧？的倍数上的期望次数。' }], phrases: [] });
+  assert.equal(out.sections.question[0].map(p => p.t === 'text' ? p.v : p.tex).join(''), '指针停在大于 4 的数或 2的倍数上的期望次数？');
+  const fine = apply('Q', para, { title: '', paragraphs: [{ id: 'question.0', text: '是大于 ⟦1⟧ 的数还是 ⟦3⟧ 的倍数？' }], phrases: [] });
+  assert.equal(fine.sections.question[0].map(p => p.t === 'text' ? p.v : p.tex).join(''), '是大于 4 的数还是 2 的倍数？');
 });
 
 test('a paragraph that lost or doubled a formula stays in English', () => {

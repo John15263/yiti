@@ -4,3 +4,4 @@
 data/
 .claude/
 .DS_Store
+dist/

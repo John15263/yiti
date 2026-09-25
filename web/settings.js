@@ -1,5 +1,7 @@
 // The settings dialog: which service does the text and the voice, and their keys. The page never receives a
 // key back, only its last four characters; an empty box keeps the key already saved.
+import { request } from './backend.js';
+
 const $ = id => document.getElementById(id);
 const KEYS = ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'DASHSCOPE_API_KEY'];
 const NAMES = { gemini: 'Gemini', deepseek: 'DeepSeek', qwen: '阿里云百炼', none: '不用语音' };
@@ -39,12 +41,7 @@ export function createSettings({ onSaved = () => {} } = {}) {
     line(`文字（${NAMES[current.text]}）`, result.text);
     line(`语音（${NAMES[current.voice]}）`, result.voice);
   }
-  async function call(path, body) {
-    const res = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '没有成功。');
-    return data;
-  }
+  const call = request;
 
   form.addEventListener('change', fit);
   $('settings-close').onclick = () => dialog.close();

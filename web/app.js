@@ -2,6 +2,7 @@ import { draw } from './math.js';
 import { learnable, learnParas } from './mode.js';
 import { createVoice } from './voice.js';
 import { createSettings } from './settings.js';
+import { request, subscribe } from './backend.js';
 
 const $ = id => document.getElementById(id);
 const KIND = { tutorial: '讲解', example: '例题', question: '练习题' };
@@ -32,12 +33,8 @@ function error(message) { $('error').textContent = message || ''; $('error').hid
 
 async function post(path, body) {
   error('');
-  try {
-    const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await res.json();
-    if (!res.ok) { error(data.error || '没有成功。'); return null; }
-    render(data); return data;
-  } catch { error('连不上本机的一题服务。'); return null; }
+  try { const data = await request(path, body); render(data); return data; }
+  catch (e) { error(e.message); return null; }
 }
 const command = (type, extra = {}) => post('/api/command', { type, key: record().key, index: record().progress.index, ...extra });
 
@@ -287,9 +284,5 @@ const settings = createSettings();
 $('settings-open').onclick = () => void settings.open();
 const voice = createVoice({ getRecord: record, draftOf: () => $('write-text').value, available: () => state?.voice !== false });
 
-function connect() {
-  const events = new EventSource('/api/events');
-  events.addEventListener('state', e => { $('connection').hidden = true; render(JSON.parse(e.data)); });
-  events.onerror = () => { $('connection').textContent = '和本机断开了，正在重连…'; $('connection').hidden = false; };
-}
-connect();
+subscribe(value => { $('connection').hidden = true; render(value); },
+  () => { $('connection').textContent = '和一题断开了，正在重连…'; $('connection').hidden = false; });

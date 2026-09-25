@@ -8,10 +8,11 @@ import { Store } from '../server/store.mjs';
 import { createServer } from '../server/http.mjs';
 import { config } from '../server/config.mjs';
 import { Settings, testServices } from '../server/settings.mjs';
+import { settingsFile } from '../server/settings-file.mjs';
 
 test('keys are kept on disk for the owner only and shown back by their last four characters', async t => {
   const path = join(mkdtempSync(join(tmpdir(), 'yiti-')), 'settings.json');
-  const settings = new Settings(path);
+  const settings = new Settings(settingsFile(path));
   const cfg = config(settings.env({}));
   const token = 't'.repeat(64);
   const app = createServer({ store: new Store(':memory:'), cfg, settings, token, webRoot: fileURLToPath(new URL('../web', import.meta.url)) });

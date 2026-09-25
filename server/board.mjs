@@ -1,5 +1,7 @@
 import { check, fields, id, oneOf } from './validation.mjs';
 import { normalize, fingerprint, textFingerprint } from './capture.mjs';
+
+const HASH_VERSION = 2;
 import { learnable } from '../web/mode.js';
 
 const now = () => new Date().toISOString();
@@ -7,7 +9,7 @@ export const progress = count => ({ index: 0, phase: 'learn', inputs: Array.from
 
 function fresh(c, key, hash, at) {
   return { key, task: c.task, topic: c.topic, url: c.url, step: c.step, title: c.title, sections: c.sections, hash, text_hash: textFingerprint(c.sections),
-    created_at: at, updated_at: at, prep: { status: 'none' }, translation: { status: 'none' }, progress: progress(0), say: { attempts: [] }, voice: [] };
+    hash_version: HASH_VERSION, created_at: at, updated_at: at, prep: { status: 'none' }, translation: { status: 'none' }, progress: progress(0), say: { attempts: [] }, voice: [] };
 }
 
 // Follows whichever Math Academy step was read last, and keeps what was done on each step.
@@ -18,6 +20,13 @@ export class Board {
     for (const rec of store.steps()) {
       let touched = false;
       if (!rec.text_hash) { rec.text_hash = textFingerprint(rec.sections); rec.translation ||= { status: 'none' }; touched = true; }
+      // Fingerprints moved from SHA-256 to a hash the browser can compute; what was made from the same text still is.
+      if (rec.hash_version !== HASH_VERSION) {
+        const hash = fingerprint(rec.sections), text = textFingerprint(rec.sections);
+        if (rec.prep.hash === rec.hash) rec.prep.hash = hash;
+        if (rec.translation?.hash === rec.text_hash) rec.translation.hash = text;
+        Object.assign(rec, { hash, text_hash: text, hash_version: HASH_VERSION }); touched = true;
+      }
       if (rec.prep.status === 'running') { rec.prep = { status: 'error', error: '服务重启，拆块中断了，可以重试。' }; touched = true; }
       if (rec.translation?.status === 'running') { rec.translation = { status: 'error', error: '服务重启，翻译中断了，可以重试。' }; touched = true; }
       for (const a of [...rec.progress.inputs.flatMap(i => i.attempts), ...rec.say.attempts]) if (a.status === 'running') {
