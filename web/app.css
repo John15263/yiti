@@ -1,0 +1,75 @@
+/* 一题 · 和一句同一套纸面：一行顶栏，单列，一个主按钮；次要的都是小字。 */
+:root{font-family:Inter,"Helvetica Neue","PingFang SC","Hiragino Sans",sans-serif;color:#283b34;background:#fdfdfb;font-synthesis:none;--muted:#7a8781;--line:#e4e8e3;--accent:#2f5a74;--soft:#f2f5f6;--ink:#253f33;--good:#3b6e4a;--warn:#8a5a1f}
+*{box-sizing:border-box}body{margin:0;background:#fdfdfb}
+button{font:inherit;color:inherit;border:1px solid #cfd6dc;background:transparent;border-radius:999px;padding:10px 20px;min-height:42px;cursor:pointer;font-size:14px;transition:background .15s ease,border-color .15s ease}
+button:hover{background:#eef2f5}button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}button.primary:hover{background:#244a60}
+button.link{border:0;min-height:0;padding:0;border-radius:0;background:none;color:var(--muted);font-size:13px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:#c9d1cc}
+button.link:hover{background:none;color:var(--ink)}
+button:focus-visible,a:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px solid #6d8fa6;outline-offset:3px}
+[hidden]{display:none!important}
+code{font-family:"SF Mono",Menlo,monospace;font-size:.9em;background:var(--soft);padding:1px 5px;border-radius:4px}
+.muted{color:var(--muted);font-size:13px;line-height:1.8}
+
+/* 顶栏 */
+header{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;margin:0 auto;padding:0 28px;width:min(760px,100%);height:58px;font-size:13px;background:#fdfdfb}
+.brand{display:flex;gap:9px;align-items:center;text-decoration:none;font-size:17px;letter-spacing:.1em;color:inherit;margin-right:4px}
+.dot{width:9px;height:9px;border-radius:2px;background:#5f8aa6;transform:rotate(45deg)}
+#where{color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#connection{font-size:12px;color:#a04630}
+.chip{min-height:0;padding:5px 12px;font-size:12px;border-color:var(--line);color:var(--muted)}
+.chip:hover{color:var(--ink)}
+.chip.live{border-color:#b85c46;color:#b85c46}
+.chip.warn{background:#fff5e2;border-color:#e1cda4;color:#805b24}
+main{width:min(760px,100%);margin:auto;padding:6px 28px 72px}
+h1{font-weight:450;font-size:19px;line-height:1.7;margin:24px 0 12px}
+
+/* 一步 */
+.eyebrow{color:var(--muted);font-size:13px;margin:10px 0 8px}
+.status-line{display:block;min-height:0;padding:0;margin:0 0 10px;border:0;border-radius:0;background:none;font-size:13px;color:var(--muted);text-align:left}
+.status-line:hover{background:none}.status-line:disabled{opacity:1;cursor:default}
+.mathtext p,.original p{font-size:16px;line-height:1.85;margin:0 0 8px}
+.mathtext p.display,.original p.display{text-align:center;margin:10px 0 14px;overflow-x:auto;overflow-y:hidden;padding:2px 0}
+math{font-size:1.1em}math[display=block]{margin:0 auto}
+code.tex{white-space:pre-wrap}
+#context p{font-size:17px}
+.choices{list-style:none;padding:0;margin:6px 0 4px;display:flex;flex-wrap:wrap;gap:8px}
+.choices li{border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:15px;display:flex;gap:8px;align-items:center}
+.choices li p{margin:0}.choices li.picked{border-color:#4c5a63;background:#f3f5f6}
+.choices .letter{color:var(--muted);font-size:13px}
+
+#blocks,#ask,#say{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.dots{display:flex;gap:5px;list-style:none;padding:0;margin:0 0 14px}
+.dots li{width:22px;height:4px;border-radius:2px;background:var(--line)}
+.dots li.passed{background:#8fb39a}.dots li.skipped{background:#dcc894}.dots li.now{background:var(--accent)}
+.original{background:var(--soft);border-radius:10px;padding:14px 16px 6px;margin:0 0 12px}
+.meaning{font-size:15px;line-height:1.9;margin:0 0 10px}
+.focus{font-size:18px;line-height:1.7;margin:0 0 4px;color:var(--ink)}
+.terms{list-style:none;padding:0;margin:0 0 6px;display:grid;gap:4px;font-size:14px;line-height:1.7}
+.terms b{font-weight:500;color:var(--accent);margin-right:10px}
+textarea{width:100%;resize:vertical;border:1px solid #d3dbe0;border-radius:10px;background:#fff;color:var(--ink);font:inherit;font-size:17px;line-height:1.7;padding:12px 14px;margin:6px 0 8px;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
+textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px #cddbe5}
+#write-text{font-family:"SF Mono",Menlo,"PingFang SC",monospace;font-size:16px}
+.hints{margin:0 0 6px;padding-left:20px;font-size:14px;line-height:1.8;color:var(--accent)}
+.verdict-line{font-size:15px;line-height:1.85;margin:6px 0 10px;white-space:pre-wrap}
+.verdict-line b{font-weight:500;margin-right:10px}
+.verdict-line b.pass{color:var(--good)}.verdict-line b.adjust{color:var(--warn)}
+.verdict-line .link,.verdict-line .muted{margin-right:12px}
+.fixed{font-size:16px;line-height:1.7;margin:0 0 12px;padding:9px 13px;border-left:3px solid #9bb7c9;background:#f7f9fa;white-space:pre-wrap}
+#checked-fixed{font-family:"SF Mono",Menlo,"PingFang SC",monospace;font-size:15px}
+.changes{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:6px;font-size:14px;line-height:1.7}
+.changes del{color:#a04630}.changes ins{text-decoration:none;color:var(--good)}.changes .why{color:var(--muted);margin-left:8px}
+
+/* 主按钮一行：一个主操作，次要操作是小字 */
+.bar{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.links{display:flex;gap:14px;align-items:center}
+
+/* 语音 */
+#voice{margin-top:26px;padding-top:12px;border-top:1px solid var(--line)}
+.transcript{font-size:14px;line-height:1.8;max-height:300px;overflow-y:auto;margin-top:6px}
+.transcript p{margin:0 0 7px}.transcript .tutor{color:var(--ink)}.transcript .user{color:var(--accent)}
+.transcript .session{color:var(--muted);font-size:12px;margin-top:12px}
+summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
+#error{background:#f9e7df;color:#873d2b;padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.7;margin:18px 0}
+
+@media (max-width:560px){header,main{padding-left:16px;padding-right:16px}}

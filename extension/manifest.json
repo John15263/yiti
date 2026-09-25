@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "一题 · Math Academy 跟随",
+  "version": "0.1.0",
+  "description": "把 Math Academy 当前这一步交给本机的一题（127.0.0.1:4318）。只读当前步骤；测验和复习不读内容。",
+  "host_permissions": ["http://127.0.0.1:4318/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    { "matches": ["https://mathacademy.com/*", "https://www.mathacademy.com/*"], "js": ["extract.js"], "world": "MAIN", "run_at": "document_idle" },
+    { "matches": ["https://mathacademy.com/*", "https://www.mathacademy.com/*"], "js": ["relay.js"], "run_at": "document_idle" }
+  ]
+}

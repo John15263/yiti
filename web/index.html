@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>一题</title>
+  <link rel="stylesheet" href="/app.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <!-- 一行顶栏：在哪一步，和两个随手的开关（中英、语音）。 -->
+  <header>
+    <a href="/" class="brand"><span class="dot" aria-hidden="true"></span>一题</a>
+    <span id="where"></span>
+    <span id="connection" role="status" hidden></span>
+    <button id="update-note" class="chip warn" hidden title="本地服务换了新代码，这个页面还是旧的">有更新 · 刷新</button>
+    <button id="lang" class="chip" hidden title="中文 / 英文原文"></button>
+    <button id="voice-open" class="chip" hidden></button>
+  </header>
+  <main>
+    <section id="waiting" hidden>
+      <h1>打开 Math Academy 的一节课，这里会跟到你正在看的那一步。</h1>
+      <p class="muted">第一次用要在 Chrome 装「一题」扩展：chrome://extensions → 开发者模式 → 加载已解压的扩展程序 → 选一题仓库里的 <code>extension</code> 文件夹，再刷新 Math Academy。</p>
+    </section>
+
+    <section id="elsewhere" hidden>
+      <h1 id="elsewhere-title"></h1>
+      <p id="elsewhere-note" class="muted"></p>
+    </section>
+
+    <!-- 一步：题目在上，当前这一块在中间，一个主按钮在下。 -->
+    <section id="step" hidden>
+      <p id="step-title" class="eyebrow"></p>
+      <button id="status-line" class="status-line" hidden></button>
+      <div id="context" class="mathtext"></div>
+      <ol id="choices" class="choices" hidden></ol>
+
+      <div id="blocks" hidden>
+        <ol id="dots" class="dots" aria-label="块"></ol>
+        <div id="learn" hidden>
+          <div id="learn-original" class="original mathtext"></div>
+          <p id="learn-meaning" class="meaning"></p>
+          <ul id="learn-terms" class="terms" hidden></ul>
+        </div>
+        <div id="write" hidden>
+          <p id="write-focus" class="focus"></p>
+          <textarea id="write-text" rows="3" spellcheck="false" autocomplete="off" placeholder="写式子、写一句话都行"></textarea>
+          <ol id="hints" class="hints"></ol>
+          <div id="checked" hidden>
+            <p class="verdict-line"><b id="checked-verdict"></b><span id="checked-note"></span></p>
+            <p id="checked-fixed" class="fixed" hidden></p>
+            <div id="checked-original" class="original mathtext"></div>
+          </div>
+        </div>
+        <p id="done" class="meaning" hidden></p>
+      </div>
+
+      <p id="ask" class="meaning" hidden>先在 Math Academy 做完、交答案，答错也没关系。<span class="muted">卡在基础上，按 ⌘ ] 问前置知识。</span></p>
+
+      <div id="say" hidden>
+        <p class="verdict-line"><b id="say-result"></b><button id="say-explain" class="link"></button><span id="say-prior" class="muted"></span></p>
+        <div id="say-explanation" class="original mathtext" hidden></div>
+        <textarea id="say-text" rows="3" spellcheck="true" autocomplete="off" placeholder="一句话说出这道题的关键一步，中文英文都行"></textarea>
+        <div id="say-review" hidden>
+          <p class="verdict-line"><b id="say-score"></b><span id="say-note"></span></p>
+          <p id="say-suggestion" class="fixed"></p>
+          <ul id="say-changes" class="changes"></ul>
+        </div>
+      </div>
+
+      <div id="bar" class="bar">
+        <button id="primary" class="primary" hidden></button>
+        <span id="links" class="links"></span>
+        <span id="work-status" class="muted" role="status"></span>
+      </div>
+      <p id="error" role="alert" hidden></p>
+    </section>
+
+    <!-- 语音：只放这一次的对话；之前的收起来。 -->
+    <section id="voice" hidden>
+      <p id="voice-status" class="muted" hidden></p>
+      <div id="voice-transcript" class="transcript" hidden></div>
+      <details id="voice-earlier" hidden><summary id="voice-earlier-title"></summary><div id="voice-earlier-list" class="transcript"></div></details>
+    </section>
+
+  </main>
+</body>
+</html>
