@@ -4,6 +4,8 @@
 
 它守一条线：**练习题交答案之前，不帮你解这道题。** Math Academy 根据你自己交的答案安排练习和复习；先被别人讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，最多用别的例子帮你补前置知识。交了之后（对错都行），再陪你把这道题弄懂。
 
+![左边是一题，右边是 Math Academy：一题跟到同一道例题，显示中文翻译，把讲解拆成小块，先看懂再遮住自己写](docs/screenshot.webp)
+
 > 这是个人学习用的非官方工具，和 Math Academy 没有关联。扩展只在你自己的浏览器里读你自己打开的页面，内容只发到你本机运行的一题。
 
 ## 需要什么
@@ -20,9 +22,10 @@
 ```sh
 git clone https://github.com/John15263/yiti.git
 cd yiti
-cp .env.example .env    # 然后在 .env 里填 GEMINI_API_KEY
 npm start               # 打开 http://127.0.0.1:4318
 ```
+
+第一次打开会弹出「设置」：选文字和语音各用哪家服务，填上 API key，点「保存并测试」，马上就知道 key 能不能用。key 只存在本机的 `data/settings.json`，页面上只显示末尾四位。以后点右上角「设置」随时改。也可以照 `.env.example` 写 `.env`，网页里的设置优先。
 
 装 Chrome 扩展（一次）：
 
@@ -48,7 +51,7 @@ npm start               # 打开 http://127.0.0.1:4318
 
 ## 设置
 
-都在 `.env` 里，模板和说明见 [.env.example](.env.example)。常用的：
+常用的几项在网页的「设置」里就能改（存在 `data/settings.json`，优先于 `.env`）；其余的写在 `.env` 里，模板和说明见 [.env.example](.env.example)：
 
 | 变量 | 作用 |
 |---|---|

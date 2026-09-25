@@ -9,17 +9,19 @@ import { Voice } from './voice.mjs';
 import { Usage } from './usage.mjs';
 import { accept } from './ws.mjs';
 import { textConfigured } from './llm.mjs';
+import { config } from './config.mjs';
+import { Settings, testServices } from './settings.mjs';
 import { voiceConfigured } from './voice-providers.mjs';
 
 // Captures come from the extension, or from a Math Academy page itself; no other site can name these origins.
 const CAPTURE_ORIGIN = /^(chrome-extension:\/\/[a-p]{32}|https:\/\/(www\.)?mathacademy\.com)$/;
 
-export function createServer({ store, cfg, webRoot, token = randomBytes(32).toString('hex'), infer, connect }) {
+export function createServer({ store, cfg, settings = new Settings(null), webRoot, token = randomBytes(32).toString('hex'), infer, connect }) {
   const streams = new Set();
   const usage = new Usage(store); cfg = { ...cfg, usage };
   const files = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.css', ['app.css', 'text/css; charset=utf-8']],
-    ...['app.js', 'math.js', 'mode.js', 'voice.js', 'voice-worklet.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
+    ...['app.js', 'math.js', 'mode.js', 'voice.js', 'voice-worklet.js', 'settings.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();
@@ -72,6 +74,18 @@ export function createServer({ store, cfg, webRoot, token = randomBytes(32).toSt
       if (req.method !== 'GET' && !bearer) check(req.headers.origin === origin, 'Same-origin write required', 403);
       if (req.method === 'GET' && path === '/api/state') return json(res, view());
       if (req.method === 'GET' && path === '/api/usage') return json(res, usage.summary());
+      if (req.method === 'GET' && path === '/api/settings') return json(res, settings.view(cfg));
+      if (req.method === 'POST' && path === '/api/settings') {
+        const values = settings.patch(await body(req));
+        let next;
+        try { next = config(settings.env(process.env, values)); } catch (e) { throw new HttpError(400, `设置不对：${e.message}`); }
+        settings.save(values);
+        // Everything holding cfg sees the new keys at once; no restart.
+        Object.assign(cfg, next);
+        publish();
+        return json(res, settings.view(cfg));
+      }
+      if (req.method === 'POST' && path === '/api/settings/test') return json(res, await testServices(cfg, { connect }));
       if (req.method === 'GET' && path === '/api/events') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
         streams.add(res);

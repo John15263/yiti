@@ -82,6 +82,9 @@ const qwen = {
   },
 };
 
-export const PROVIDERS = { gemini, qwen };
+// No voice tutor at all: the rest of 一题 works the same, without the voice button.
+const none = { name: '不用语音', configured: () => false, missing: '', model: () => '' };
+
+export const PROVIDERS = { gemini, qwen, none };
 export const voiceProvider = cfg => PROVIDERS[cfg.voiceProvider] || gemini;
 export const voiceConfigured = cfg => voiceProvider(cfg).configured(cfg);

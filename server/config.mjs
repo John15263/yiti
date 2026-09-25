@@ -27,7 +27,7 @@ export function config(env = process.env) {
   if (!/^[a-zA-Z0-9.-]{1,100}$/.test(geminiLiveModel)) throw new Error('Invalid GEMINI_LIVE_MODEL');
   // Who speaks in the voice tutor: Gemini Live, or Qwen-Omni-Realtime on Alibaba Cloud Model Studio (百炼).
   const voiceProvider = env.VOICE_PROVIDER?.trim().toLowerCase() || 'gemini';
-  if (!['gemini', 'qwen'].includes(voiceProvider)) throw new Error('Invalid VOICE_PROVIDER');
+  if (!['gemini', 'qwen', 'none'].includes(voiceProvider)) throw new Error('Invalid VOICE_PROVIDER');
   const dashscopeRegion = env.DASHSCOPE_REGION?.trim() || 'cn-beijing';
   if (!['cn-beijing', 'ap-southeast-1'].includes(dashscopeRegion)) throw new Error('Invalid DASHSCOPE_REGION');
   const dashscopeWorkspace = env.DASHSCOPE_WORKSPACE_ID?.trim() || '';

@@ -13,7 +13,9 @@
 cp .env.example .env
 ```
 
-请用户**自己**把 key 填进 `.env`（打开文件让他们粘贴），不要让用户把 key 发到对话里，也不要把 key 打印出来：
+**最简单的做法是不碰 `.env`**：启动后让用户打开 http://127.0.0.1:4318 ，页面会自动弹出「设置」，用户在那里选服务、粘贴 key、点「保存并测试」。key 不经过对话，也不会出现在终端里。
+
+要用 `.env` 的话，请用户**自己**把 key 填进去（打开文件让他们粘贴），不要让用户把 key 发到对话里，也不要把 key 打印出来：
 
 - `GEMINI_API_KEY`：默认配置下文字部分和语音陪练都用它，在 https://aistudio.google.com/apikey 申请。用不了 Google 的话可以不填，按下面两条换成国内服务。
 - 只有 DeepSeek key 的话：填 `DEEPSEEK_API_KEY`，把 `TEXT_PROVIDER` 改成 `deepseek`。翻译、拆块、检查、点评都能用。

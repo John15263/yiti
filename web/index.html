@@ -14,10 +14,12 @@
     <button id="update-note" class="chip warn" hidden title="本地服务换了新代码，这个页面还是旧的">有更新 · 刷新</button>
     <button id="lang" class="chip" hidden title="中文 / 英文原文"></button>
     <button id="voice-open" class="chip" hidden></button>
+    <button id="settings-open" class="chip" title="API key 和用哪家服务">设置</button>
   </header>
   <main>
     <section id="waiting" hidden>
       <h1>打开 Math Academy 的一节课，这里会跟到你正在看的那一步。</h1>
+      <p id="needs-key" class="meaning" hidden>还没有能用的 API key：点右上角「设置」填一个。</p>
       <p class="muted">第一次用要在 Chrome 装「一题」扩展：chrome://extensions → 开发者模式 → 加载已解压的扩展程序 → 选一题仓库里的 <code>extension</code> 文件夹，再刷新 Math Academy。</p>
     </section>
 
@@ -82,5 +84,57 @@
     </section>
 
   </main>
+
+  <!-- 设置：用哪家服务、填 key。key 存在本机，只显示末尾四位。 -->
+  <dialog id="settings">
+    <form id="settings-form">
+      <h2>设置</h2>
+      <p class="muted">key 只存在这台电脑上（<code>data/settings.json</code>），保存后只显示末尾四位；只会发给对应的服务商。这里的设置优先于 <code>.env</code>。</p>
+
+      <h3>文字 <span class="muted">翻译、拆块、检查、点评</span></h3>
+      <div class="choice">
+        <label><input type="radio" name="TEXT_PROVIDER" value="gemini"> Gemini</label>
+        <label><input type="radio" name="TEXT_PROVIDER" value="deepseek"> DeepSeek</label>
+      </div>
+
+      <h3>语音陪练</h3>
+      <div class="choice">
+        <label><input type="radio" name="VOICE_PROVIDER" value="gemini"> Gemini Live</label>
+        <label><input type="radio" name="VOICE_PROVIDER" value="qwen"> 阿里云百炼（国内可用）</label>
+        <label><input type="radio" name="VOICE_PROVIDER" value="none"> 不用语音</label>
+      </div>
+
+      <div class="field" data-need="gemini">
+        <label for="GEMINI_API_KEY">Gemini API key</label>
+        <input type="password" id="GEMINI_API_KEY" name="GEMINI_API_KEY" autocomplete="off" spellcheck="false">
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">在哪里拿</a>
+      </div>
+      <div class="field" data-need="deepseek">
+        <label for="DEEPSEEK_API_KEY">DeepSeek API key</label>
+        <input type="password" id="DEEPSEEK_API_KEY" name="DEEPSEEK_API_KEY" autocomplete="off" spellcheck="false">
+        <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">在哪里拿</a>
+      </div>
+      <div class="field" data-need="qwen">
+        <label for="DASHSCOPE_API_KEY">百炼 API key</label>
+        <input type="password" id="DASHSCOPE_API_KEY" name="DASHSCOPE_API_KEY" autocomplete="off" spellcheck="false">
+        <a id="dashscope-link" href="https://bailian.console.aliyun.com/cn-beijing/model/settings/api-key" target="_blank" rel="noreferrer">在哪里拿</a>
+      </div>
+      <div class="field" data-need="qwen">
+        <label for="DASHSCOPE_REGION">百炼区域</label>
+        <select id="DASHSCOPE_REGION" name="DASHSCOPE_REGION"><option value="cn-beijing">中国大陆（北京）</option><option value="ap-southeast-1">国际（新加坡）</option></select>
+        <span class="muted">key 是哪个区域建的就选哪个</span>
+      </div>
+      <div class="field" data-need="qwen">
+        <label for="DASHSCOPE_WORKSPACE_ID">业务空间 ID</label>
+        <input type="text" id="DASHSCOPE_WORKSPACE_ID" name="DASHSCOPE_WORKSPACE_ID" autocomplete="off" spellcheck="false" placeholder="可以不填">
+      </div>
+
+      <p id="settings-result" class="settings-result" role="status"></p>
+      <div class="bar">
+        <button type="submit" class="primary" id="settings-save">保存并测试</button>
+        <button type="button" class="link" id="settings-close">关闭</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

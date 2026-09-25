@@ -72,4 +72,19 @@ textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px #cddbe5}
 summary{cursor:pointer;font-size:13px;color:var(--muted);padding:8px 0}
 #error{background:#f9e7df;color:#873d2b;padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.7;margin:18px 0}
 
-@media (max-width:560px){header,main{padding-left:16px;padding-right:16px}}
+/* 设置 */
+dialog#settings{width:min(540px,94vw);border:1px solid var(--line);border-radius:14px;padding:22px 26px 18px;background:#fdfdfb;color:inherit;box-shadow:0 18px 50px rgba(30,45,40,.18)}
+dialog#settings::backdrop{background:rgba(30,40,36,.25)}
+#settings h2{font-weight:500;font-size:18px;margin:0 0 6px}
+#settings h3{font-weight:500;font-size:14px;margin:18px 0 8px}
+#settings h3 .muted{font-weight:400;margin-left:8px}
+#settings .choice{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
+#settings .choice label{display:flex;gap:6px;align-items:center;cursor:pointer}
+#settings .field{display:grid;grid-template-columns:118px 1fr auto;gap:6px 10px;align-items:center;margin:10px 0 0;font-size:14px}
+#settings .field .muted{grid-column:2/-1;font-size:12px;line-height:1.4}
+#settings .field a{font-size:12px;color:var(--muted)}
+#settings input[type=password],#settings input[type=text],#settings select{font:inherit;font-size:14px;padding:7px 10px;border:1px solid #d3dbe0;border-radius:8px;background:#fff;min-width:0}
+#settings .settings-result{white-space:pre-wrap;font-size:13px;line-height:1.8;margin:14px 0 0;min-height:0}
+#settings .settings-result .ok{color:var(--good)}#settings .settings-result .bad{color:#a04630}
+
+@media (max-width:560px){header,main{padding-left:16px;padding-right:16px}#settings .field{grid-template-columns:1fr}#settings .field .muted{grid-column:1}}

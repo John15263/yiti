@@ -5,15 +5,18 @@ import { config, root } from './config.mjs';
 import { Store } from './store.mjs';
 import { createServer } from './http.mjs';
 import { voiceProvider } from './voice-providers.mjs';
+import { Settings } from './settings.mjs';
 
 process.umask(0o077);
-const cfg = config();
 const data = join(root, 'data'); mkdirSync(data, { recursive: true, mode: 0o700 });
+// Keys and choices made on the settings page take precedence over .env.
+const settings = new Settings(join(data, 'settings.json'));
+const cfg = config(settings.env());
 const tokenPath = join(data, '.local-token');
 if (!existsSync(tokenPath)) writeFileSync(tokenPath, randomBytes(32).toString('hex'), { mode: 0o600 });
 chmodSync(tokenPath, 0o600);
 const store = new Store(join(data, 'yiti.sqlite'));
-const app = createServer({ store, cfg, token: readFileSync(tokenPath, 'utf8').trim(), webRoot: join(root, 'web') });
+const app = createServer({ store, cfg, settings, token: readFileSync(tokenPath, 'utf8').trim(), webRoot: join(root, 'web') });
 app.server.listen(cfg.port, '127.0.0.1', () => {
   console.log(`一题 http://127.0.0.1:${cfg.port}`);
   console.log(`Text: ${cfg.textProvider} · ${cfg.textProvider === 'deepseek' ? `${cfg.deepseekModel} · translate ${cfg.deepseekTranslateModel}` : `${cfg.geminiModel} · translate ${cfg.geminiTranslateModel}`}`);

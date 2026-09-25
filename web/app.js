@@ -1,11 +1,12 @@
 import { draw } from './math.js';
 import { learnable, learnParas } from './mode.js';
 import { createVoice } from './voice.js';
+import { createSettings } from './settings.js';
 
 const $ = id => document.getElementById(id);
 const KIND = { tutorial: '讲解', example: '例题', question: '练习题' };
 const PAGES = { quiz: '测验', review: '复习', multistep: '多步题', diagnostic: '诊断', assessment: '测评' };
-let state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnSay = '', drawnExplain = '', explainOpen = false;
+let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnSay = '', drawnExplain = '', explainOpen = false;
 const asked = new Set();
 const record = () => state?.record || null;
 
@@ -63,6 +64,9 @@ function render(next) {
   $('lang').hidden = !onStep;
   $('lang').textContent = lang === 'zh' ? 'EN' : '中';
   $('lang').title = lang === 'zh' ? '看英文原文' : '看中文';
+  // With no text key at all nothing works yet, so the settings open once by themselves.
+  $('needs-key').hidden = next.gemini;
+  if (!next.gemini && !askedForKey) { askedForKey = true; void settings.open(); }
   if (!cur) { show('waiting'); voice.update(); return; }
   if (!onStep) {
     show('elsewhere');
@@ -95,7 +99,7 @@ function render(next) {
 function translation(rec, gemini, notes) {
   if (lang !== 'zh') return;
   const t = rec.translation || {}, fresh = t.hash === rec.text_hash, ask = `t:${rec.key}:${rec.text_hash}`;
-  if (!gemini) notes.push({ text: '要看中文，需要在 .env 里填文字模型的 key 并重启一题。' });
+  if (!gemini) notes.push({ text: '要看中文，先点右上角「设置」填 API key。', retry: () => void settings.open() });
   else if (fresh && t.status === 'error') notes.push({ text: `翻译没成功，点这里重试。`, retry: () => { asked.delete(ask); void post('/api/translate', { key: rec.key }); } });
   else if (fresh && t.status === 'ready') { if (t.missing) notes.push({ text: `有 ${t.missing} 段没翻好，显示的是原文。` }); }
   else notes.push({ text: '正在翻成中文…' });
@@ -124,7 +128,7 @@ function renderLearnable(rec, gemini, notes) {
     const ask = `${rec.key}:${rec.hash}`, paras = learnParas(rec).length;
     // Preparing costs a call, so it starts when this page is actually showing the step, once.
     if (prep.status === 'none' && gemini && paras && !asked.has(ask)) { asked.add(ask); void post('/api/prepare', { key: rec.key }); }
-    if (!gemini) notes.push({ text: '要拆块，需要在 .env 里填文字模型的 key 并重启一题。' });
+    if (!gemini) notes.push({ text: '要拆块，先点右上角「设置」填 API key。', retry: () => void settings.open() });
     else if (prep.status === 'error') notes.push({ text: '拆块没成功，点这里重试。', retry: () => { asked.add(ask); void post('/api/prepare', { key: rec.key }); } });
     else notes.push({ text: paras ? '正在拆成几块…' : '还没有读到讲解内容。' });
     return {};
@@ -279,6 +283,8 @@ addEventListener('keydown', event => {
   primaryRun?.();
 });
 
+const settings = createSettings();
+$('settings-open').onclick = () => void settings.open();
 const voice = createVoice({ getRecord: record, draftOf: () => $('write-text').value, available: () => state?.voice !== false });
 
 function connect() {
