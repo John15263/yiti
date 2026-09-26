@@ -251,6 +251,7 @@ function submitSay() {
 }
 $('primary').onclick = () => primaryRun?.();
 $('update-note').onclick = () => location.reload();
+$('demo-open').onclick = () => void post('/api/demo', {});
 $('say-explain').onclick = () => { explainOpen = !explainOpen; if (state) render(state); };
 $('lang').onclick = () => {
   lang = lang === 'zh' ? 'en' : 'zh';

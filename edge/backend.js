@@ -13,6 +13,7 @@ import { tokensOf, costOf, PURPOSES } from '../server/usage.js';
 import PROMPTS from '../prompts.js';
 import { BrowserStore } from './store.js';
 import { rtcUpstream, qwenRtcCheck } from './rtc.js';
+import { DEMO } from './demo.js';
 
 usePrompts(PROMPTS);
 const store = await BrowserStore.open();
@@ -52,6 +53,7 @@ export async function request(path, body) {
   try {
     if (path === '/api/state') return view();
     if (path === '/api/command') { board.command(body); return view(); }
+    if (path === '/api/demo') { board.capture(DEMO); return view(); }
     const action = { '/api/prepare': 'prepare', '/api/translate': 'translate', '/api/check': 'check', '/api/say': 'say' }[path];
     if (action) { teach[action](body); return view(); }
     if (path === '/api/settings' && body === undefined) return settings.view(cfg);

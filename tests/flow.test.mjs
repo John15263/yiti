@@ -151,3 +151,12 @@ test('records fingerprinted with the old hash keep their preparation and transla
   assert.equal(rec.prep.status, 'ready');
   assert.equal(rec.translation.hash, textFingerprint(sections));
 });
+
+test('the built-in example can be tried without Math Academy', async t => {
+  const { api } = await harness(t);
+  const { body } = await api('/api/demo', {});
+  assert.equal(body.current.key, '0-e1');
+  assert.equal(body.record.step.type, 'example');
+  assert.equal(body.record.sections.explanation.length, 6);
+  assert.ok(body.record.sections.explanation.flat().filter(p => p.t === 'math').every(p => p.mml.startsWith('<math')));
+});

@@ -5,3 +5,4 @@ data/
 .claude/
 .DS_Store
 dist/
+docs/store/raw/

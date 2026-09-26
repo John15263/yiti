@@ -39,10 +39,15 @@ export function rtcUpstream(url, options = {}) {
   player.autoplay = true;
   pc.ontrack = e => { player.srcObject = e.streams[0] || new MediaStream([e.track]); player.play().catch(() => {}); };
   const transceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
+  // The microphone joins only once the session has taken its settings: audio already waiting when they arrive
+  // makes the service refuse them ("Cannot change turn_detection while input audio is pending", seen 2026-09-26).
+  let microphone = null, configured = false;
+  const listen = () => transceiver.sender.replaceTrack(microphone?.getAudioTracks()[0] || null).catch(() => {});
   const deliver = async e => {
     let data = e.data;
     if (data instanceof Blob) data = await data.text();
     else if (typeof data !== 'string') data = new TextDecoder().decode(data);
+    if (!configured && /"type"\s*:\s*"session\.updated"/.test(data)) { configured = true; listen(); }
     emit('message', data);
   };
   const open = () => { if (socket.readyState !== 0) return; socket.readyState = 1; emit('open'); };
@@ -60,8 +65,8 @@ export function rtcUpstream(url, options = {}) {
   Object.assign(socket, {
     send(text) { const ch = theirs?.readyState === 'open' ? theirs : ours; if (ch.readyState === 'open') ch.send(text); },
     close: end,
-    // The page hands over the microphone once it has it; until then nothing is sent.
-    useMicrophone(stream) { transceiver.sender.replaceTrack(stream?.getAudioTracks()[0] || null).catch(() => {}); },
+    // The page hands over the microphone once it has it; it is sent only after the session is configured.
+    useMicrophone(stream) { microphone = stream; if (configured) listen(); },
   });
   (async () => {
     try {

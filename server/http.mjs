@@ -10,6 +10,7 @@ import { Voice } from './voice.mjs';
 import { Usage } from './usage.mjs';
 import { accept } from './ws.mjs';
 import { textConfigured } from './llm.mjs';
+import { DEMO } from '../web/demo.js';
 import { config } from './config.mjs';
 import { Settings, testServices } from './settings.mjs';
 import { voiceConfigured } from './voice-providers.mjs';
@@ -22,7 +23,7 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   const usage = new Usage(store); cfg = { ...cfg, usage };
   const files = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.css', ['app.css', 'text/css; charset=utf-8']],
-    ...['app.js', 'math.js', 'mode.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
+    ...['app.js', 'math.js', 'mode.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js', 'demo.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();
@@ -97,6 +98,8 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
       }
       if (req.method === 'POST') {
         if (path === '/api/command') { board.command(await body(req)); return json(res, view()); }
+        // The example written for 一题 itself, followed as if it were open on Math Academy.
+        if (path === '/api/demo') { await body(req); board.capture(DEMO); return json(res, view()); }
         const action = { '/api/prepare': 'prepare', '/api/translate': 'translate', '/api/check': 'check', '/api/say': 'say' }[path];
         if (action) { teach[action](await body(req)); return json(res, view()); }
       }
