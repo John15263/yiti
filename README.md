@@ -15,8 +15,8 @@
 
 ## 插件版
 
-1. 构建插件（需要 Node 24）：`node edge/build.mjs`，生成 `dist/edge/` 文件夹和 `dist/yiti-edge-<版本>.zip`。拿到别人构建好的 zip 的话，解压就行，跳过这一步。
-2. Edge 打开 `edge://extensions`（Chrome 是 `chrome://extensions`），打开「开发人员模式」，点「加载解压缩的扩展」，选 `dist/edge` 文件夹。
+1. 拿到插件：从 [Releases](https://github.com/John15263/yiti/releases) 下载最新的 `yiti-extension-<版本>.zip` 并解压；或者自己构建（需要 Node 24）：`node edge/build.mjs`，生成 `dist/edge/` 文件夹。
+2. Edge 打开 `edge://extensions`（Chrome 是 `chrome://extensions`），打开「开发人员模式」，点「加载解压缩的扩展」，选解压出来的文件夹（自己构建的话是 `dist/edge`；**不是**源代码里的 `edge` 文件夹）。
 3. 点工具栏上一题的图标，侧边栏打开，会弹出「设置」：填 API key，点「保存并测试」。**在中国大陆，一个阿里云百炼的 key 就够了**：文字选「阿里云百炼（千问）」，语音选「阿里云百炼」，区域选中国大陆，并填上**业务空间 ID**（插件里的语音走 WebRTC，必须用业务空间的专属地址；在百炼控制台右上角能看到）。
 4. 打开或刷新 Math Academy 的一节课，侧边栏会跟到你正在看的那一步。
 5. 第一次按 ⌘] 开语音时，如果侧边栏没法直接要麦克风权限，一题会打开一个授权页，在那里允许一次就好。

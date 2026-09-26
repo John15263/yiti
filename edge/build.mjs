@@ -1,6 +1,7 @@
 // Builds the browser extension (Edge and Chrome) into dist/edge from the same code the local server runs:
 //   node edge/build.mjs
-// Then load dist/edge with "Load unpacked", or hand out dist/yiti-edge-<version>.zip.
+// Then load dist/edge with "Load unpacked", or hand out dist/yiti-extension-<version>.zip.
+// This folder is the source, not an extension: its manifest is only a template, so it cannot be loaded by mistake.
 import { cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -34,11 +35,12 @@ writeFileSync(to('prompts.js'), `// Built from prompts/*.txt by edge/build.mjs.\
 
 // Reading Math Academy is the same content script as the local version's.
 for (const file of ['extract.js', 'relay.js']) cpSync(from('extension', file), to(file));
-for (const file of ['manifest.json', 'background.js', 'permission.html', 'permission.js']) cpSync(from('edge', file), to(file));
+cpSync(from('edge/manifest.template.json'), to('manifest.json'));
+for (const file of ['background.js', 'permission.html', 'permission.js']) cpSync(from('edge', file), to(file));
 cpSync(from('edge/icons'), to('icons'), { recursive: true });
 
-const { version } = JSON.parse(readFileSync(from('edge/manifest.json'), 'utf8'));
-const zip = join(root, `dist/yiti-edge-${version}.zip`);
+const { version } = JSON.parse(readFileSync(from('edge/manifest.template.json'), 'utf8'));
+const zip = join(root, `dist/yiti-extension-${version}.zip`);
 rmSync(zip, { force: true });
 execFileSync('zip', ['-qr', zip, '.'], { cwd: out });
 console.log(`built ${out}\nzipped ${zip}`);
