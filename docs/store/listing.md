@@ -148,13 +148,13 @@ Yiti is an unofficial study tool and is not affiliated with Math Academy.
 
 ## 6. 审核备注（Notes for certification）
 
-提交前，建议专门给审核员建一个 **Google Gemini 的 API key**（https://aistudio.google.com/apikey ，可以设用量上限），审核通过后删掉。把它填到下面的 `<KEY>` 处。审核员多半在海外，用 Gemini 最方便；他们大概率没有 Math Academy 账号，所以用内置示例测试。
+提交前，专门给审核员建一个 **Google Gemini 的 API key**（https://aistudio.google.com/apikey ），审核通过后删掉。用量上限只能按项目设，所以把它建在单独的项目里，再给这个项目设月上限（比如 $2）。把 key 填到下面的 `PASTE_KEY_HERE` 处（用尖括号 `<KEY>` 时，Partner Center 的输入框吞掉过它后面的换行）。审核员多半在海外，用 Gemini 最方便；他们大概率没有 Math Academy 账号，所以用内置示例测试。
 
 ```
 How to test without a Math Academy account (it is a paid service):
 
 1. Click the Yiti icon in the toolbar. The side panel opens and shows Settings.
-2. Under 文字 (text) choose "Gemini"; under 语音陪练 (voice) choose "Gemini Live". Paste this test key into "Gemini API key": <KEY>
+2. Under 文字 (text) choose "Gemini"; under 语音陪练 (voice) choose "Gemini Live". Paste this test key into "Gemini API key": PASTE_KEY_HERE
    Click "保存并测试" (save and test); both lines should show "✓ 可用" (available). Close the dialog.
 3. Click "先看一个示例" (try an example). A built-in worked example (written for this extension, not Math Academy content) opens, is translated into Chinese and split into blocks.
 4. Press the dark button "遮住，自己写" (hide and write), type anything, press the button again to have it checked. "下一块" goes to the next block.
