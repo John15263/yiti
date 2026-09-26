@@ -4,12 +4,16 @@
 
 ## 1. 上传包（Packages）
 
-上传 `dist/yiti-extension-0.3.0.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。
+上传 `dist/yiti-extension-0.3.1.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。
 
-包里的清单决定了两项商店里**不能再改**的内容：
+包里的 `edge/_locales/<语言>/messages.json` 决定了商店里**不能再改**的两项，每种语言一份：
 
-- 名称：`一题 · 数学课中文陪练`
-- 简短描述：`配合 Math Academy 的中文学习陪练：翻译、例题拆块先看懂再默写、做完题说一句关键步骤、语音补前置知识。用你自己的 API key，不经过第三方服务器。`
+| 语言 | 名称 | 简短描述 |
+|---|---|---|
+| zh_CN（默认） | `一题 · 数学课中文陪练` | `配合 Math Academy 的中文学习陪练：翻译、例题拆块先看懂再默写、做完题说一句关键步骤、语音补前置知识。用你自己的 API key，不经过第三方服务器。` |
+| en_US | `Yiti 一题 · Chinese companion for math lessons` | `A Chinese study companion for Math Academy: translation, worked examples in small blocks, a one-sentence review and a voice tutor.` |
+
+商店只给包里 `_locales` 有的语言开商店页：清单里名称和描述写死的话，只会出现一个 English (United States)。简短描述最多 132 个字符（构建时会检查）。
 
 名称里没有用 “Math Academy”：商店不允许让人误以为是官方产品。描述里说“配合 Math Academy”是说明用途，并在详细描述里写明非官方。
 
@@ -20,7 +24,7 @@
 
 ## 3. 属性（Properties）
 
-- Category：**Education**
+- Category：**Productivity**（Edge 的分类里没有 Education）
 - Website：`https://github.com/John15263/yiti`
 - Support contact detail：`https://github.com/John15263/yiti/issues`
 - Mature content：不勾
@@ -46,6 +50,12 @@ Helps Chinese-speaking students study on Math Academy: in a side panel, it follo
 | Host: dashscope.aliyuncs.com, dashscope-intl.aliyuncs.com | `Calls Alibaba Cloud Model Studio (Qwen) with the user's own API key, when the user chooses Qwen for translation and checking.` |
 | Host: *.maas.aliyuncs.com | `Opens the Qwen voice tutor over WebRTC at the user's own Model Studio workspace address (https://<workspace>.<region>.maas.aliyuncs.com), when the user chooses Qwen for voice. The subdomain is the user's workspace ID, so it cannot be listed in advance.` |
 
+Partner Center 里所有网站（Host）权限只有**一个**框，实际填的是合在一起的这段：
+
+```
+mathacademy.com (content script): reads only the lesson step currently open (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along; on quizzes, reviews and other non-lesson pages it reads only the page type. The other hosts are AI providers, contacted directly with the user's own API key and only when the user chooses them in Settings: generativelanguage.googleapis.com (Google Gemini, text and voice); api.deepseek.com (DeepSeek, text); dashscope.aliyuncs.com and dashscope-intl.aliyuncs.com (Alibaba Cloud Model Studio / Qwen, text); *.maas.aliyuncs.com (Qwen voice over WebRTC at the user's own workspace address https://<workspace>.<region>.maas.aliyuncs.com, so the subdomain cannot be listed in advance). No developer server is contacted.
+```
+
 ### Are you using remote code?
 
 **No, I am not using remote code.**（所有代码都在包里；插件只和 AI 服务商交换数据，不下载代码。）
@@ -68,7 +78,7 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 
 ## 5. 商店页面（Store listings）
 
-建议先填 **Chinese (Simplified)**，再加一个 **English**（审核员和海外华人学生看得懂）。两种语言都用下面的图。
+包里有两种语言，商店页各填一份：**English (United States)** 和 **Chinese (Simplified)**。两种语言都用下面的图；一种语言传好之后，可以用图下面的 “Duplicate … for all languages” 复制到另一种语言。
 
 ### 图片
 

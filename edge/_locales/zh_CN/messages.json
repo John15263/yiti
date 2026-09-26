@@ -1,0 +1,5 @@
+{
+  "extensionName": { "message": "一题 · 数学课中文陪练" },
+  "extensionDescription": { "message": "配合 Math Academy 的中文学习陪练：翻译、例题拆块先看懂再默写、做完题说一句关键步骤、语音补前置知识。用你自己的 API key，不经过第三方服务器。" },
+  "actionTitle": { "message": "打开一题" }
+}

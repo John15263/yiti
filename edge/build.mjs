@@ -39,8 +39,18 @@ cpSync(from('edge/manifest.template.json'), to('manifest.json'));
 for (const file of ['background.js', 'permission.html', 'permission.js']) cpSync(from('edge', file), to(file));
 cpSync(from('edge/icons'), to('icons'), { recursive: true });
 
-const { version } = JSON.parse(readFileSync(from('edge/manifest.template.json'), 'utf8'));
-const zip = join(root, `dist/yiti-extension-${version}.zip`);
+// Name, description and toolbar title come from _locales: the store offers a listing for each language found there.
+const manifest = JSON.parse(readFileSync(from('edge/manifest.template.json'), 'utf8'));
+const locales = readdirSync(from('edge/_locales'));
+if (!locales.includes(manifest.default_locale)) throw new Error(`_locales has no ${manifest.default_locale}, the default locale`);
+for (const locale of locales) {
+  const messages = JSON.parse(readFileSync(from('edge/_locales', locale, 'messages.json'), 'utf8'));
+  for (const [, key] of JSON.stringify(manifest).matchAll(/__MSG_(\w+)__/g)) if (!messages[key]?.message) throw new Error(`_locales/${locale} has no ${key}`);
+  if ([...messages.extensionDescription.message].length > 132) throw new Error(`_locales/${locale}: the description is over 132 characters`);
+}
+cpSync(from('edge/_locales'), to('_locales'), { recursive: true });
+
+const zip = join(root, `dist/yiti-extension-${manifest.version}.zip`);
 rmSync(zip, { force: true });
 execFileSync('zip', ['-qr', zip, '.'], { cwd: out });
 console.log(`built ${out}\nzipped ${zip}`);
