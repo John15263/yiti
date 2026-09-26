@@ -162,4 +162,6 @@ How to test without a Math Academy account (it is a paid service):
 6. "EN" in the header switches between Chinese and the English original.
 
 On mathacademy.com, the content script reads only the lesson step currently open and sends it to the side panel; nothing is read on quizzes or reviews. All model calls go directly from the extension to the provider chosen in Settings, with the user's own key; there is no developer server.
+
+DeepSeek and Alibaba Cloud Model Studio (Qwen) are alternative providers for the same features, chosen in the same Settings dialog and run through the same code; the Gemini test key above covers both text and voice, so no other key is needed. The key exists only for this review and will be deleted afterwards.
 ```
