@@ -80,7 +80,7 @@ export class Teach {
     this.running.add(job);
     Promise.resolve().then(job).catch(error => {
       const rec = this.board.record(key);
-      if (rec) { fail(rec, textError(error)); this.board.save(rec); }
+      if (rec) { fail(rec, textError(error, this.cfg)); this.board.save(rec); }
     }).finally(() => this.running.delete(job));
   }
 

@@ -16,7 +16,9 @@ export async function geminiJSON(packet, cfg, { instructions, schema, tokens = 4
     });
   } catch { throw new Error('Gemini network error or timeout'); }
   if (!response.ok) throw new Error(`Gemini HTTP ${response.status}`);
-  const data = await response.json(), candidate = data.candidates?.[0];
+  let data;
+  try { data = await response.json(); } catch { throw new Error('Gemini network error or timeout'); }
+  const candidate = data.candidates?.[0];
   // A reply that fails the checks below was still billed, so it is counted before them.
   cfg.usage?.record({ purpose, model: typeof data.modelVersion === 'string' ? data.modelVersion : model, usage: data.usageMetadata, round_id: key });
   check(candidate?.finishReason === 'STOP', 'Invalid Gemini response');

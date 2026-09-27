@@ -12,7 +12,7 @@ const text = cfg => TEXT[cfg.textProvider] || TEXT.gemini;
 
 export function textJSON(packet, cfg, opts, request = fetch) {
   const { cheap, ...rest } = opts;
-  if (cfg.textProvider === 'deepseek') return deepseekJSON(packet, cfg, { ...rest, model: cheap ? cfg.deepseekTranslateModel : cfg.deepseekModel }, request);
+  if (cfg.textProvider === 'deepseek') return deepseekJSON(packet, cfg, { ...rest, cheap, model: cheap ? cfg.deepseekTranslateModel : cfg.deepseekModel }, request);
   if (cfg.textProvider === 'qwen') return qwenJSON(packet, cfg, { ...rest, cheap, model: cheap ? cfg.qwenTranslateModel : cfg.qwenTextModel }, request);
   return geminiJSON(packet, cfg, { ...rest, model: cheap ? cfg.geminiTranslateModel : cfg.geminiModel }, request);
 }
@@ -37,7 +37,10 @@ async function chatJSON(packet, cfg, { instructions, schema, tokens = 4096, limi
     });
   } catch { throw new Error(`${name} network error or timeout`); }
   if (!response.ok) throw new Error(`${name} HTTP ${response.status}`);
-  const data = await response.json(), choice = data.choices?.[0], u = data.usage;
+  // The reply can still be cut off after its headers: DeepSeek sends them at once and the answer only when done.
+  let data;
+  try { data = await response.json(); } catch { throw new Error(`${name} network error or timeout`); }
+  const choice = data.choices?.[0], u = data.usage;
   // Thinking is inside completion_tokens and billed as output, so it is not counted a second time.
   cfg.usage?.record({ purpose, model: typeof data.model === 'string' ? data.model : model,
     usage: u && { promptTokenCount: u.prompt_tokens, candidatesTokenCount: u.completion_tokens }, round_id: key });
@@ -47,11 +50,16 @@ async function chatJSON(packet, cfg, { instructions, schema, tokens = 4096, limi
   return { value: JSON.parse(raw), model: typeof data.model === 'string' ? data.model.slice(0, 100) : model };
 }
 
-// DeepSeek refuses "json_schema" (tried 2026-09-25).
-export function deepseekJSON(packet, cfg, opts, request = fetch) {
+// DeepSeek refuses "json_schema" (tried 2026-09-25). It thinks first by default, which judging maths wants
+// (without it the same one-sentence review scored 76–90 instead of 90–92); translating does not, and a step is
+// then translated in about 2 s instead of 7–11 s (measured 2026-09-27).
+export function deepseekJSON(packet, cfg, { cheap, ...opts }, request = fetch) {
   check(cfg.deepseekKey, textKeyMissing({ textProvider: 'deepseek' }), 503);
-  return chatJSON(packet, cfg, { model: cfg.deepseekModel, ...opts },
-    { name: 'DeepSeek', url: 'https://api.deepseek.com/chat/completions', apiKey: cfg.deepseekKey, strict: false }, request);
+  // Thinking, a check or review took 5–19 s where 30 s is the usual wait, so a call that thinks gets at least a minute.
+  const timeout = cheap ? opts.timeout : Math.max(opts.timeout ?? cfg.geminiTimeout, 60000);
+  return chatJSON(packet, cfg, { model: cfg.deepseekModel, ...opts, timeout },
+    { name: 'DeepSeek', url: 'https://api.deepseek.com/chat/completions', apiKey: cfg.deepseekKey, strict: false,
+      extra: cheap ? { thinking: { type: 'disabled' } } : {} }, request);
 }
 // Qwen on Model Studio keeps to a strict schema (tried 2026-09-26). It thinks first by default, which is too
 // slow to wait on here, so thinking is off unless QWEN_THINKING=on, and never for translating.
@@ -62,13 +70,16 @@ export function qwenJSON(packet, cfg, { cheap, ...opts }, request = fetch) {
     { name: 'Qwen', url: `https://${host}/compatible-mode/v1/chat/completions`, apiKey: cfg.dashscopeKey, strict: true, extra: { enable_thinking: cfg.qwenThinking && !cheap } }, request);
 }
 
-export function textError(error) {
-  const who = /^(DeepSeek|Qwen)\b/.exec(error.message)?.[1];
-  if (!who) return geminiError(error);
-  const name = who === 'Qwen' ? '千问' : 'DeepSeek';
-  if (new RegExp(`^${who} HTTP (401|403)$`).test(error.message)) return `${name}没有接受请求：key 不对，或者没有这个模型的权限。`;
-  if (error.message === `${who} HTTP 402`) return `${name}账户余额不足，充值后可以重试。`;
-  if (error.message === `${who} HTTP 429`) return `${name}请求太频繁，稍后再试。`;
-  if (error.message === `${who} network error or timeout`) return `${name}暂时连接不上或等待超时，可以重试。`;
-  return `这次未取得有效的${name}内容，可以重试。`;
+// What the learner is told when a text call fails. A reply that arrived but failed the checks carries no
+// provider's name, so it is told by the one chosen in the settings.
+export function textError(error, cfg = {}) {
+  const who = /^(Gemini|DeepSeek|Qwen)\b/.exec(error.message)?.[1] || { deepseek: 'DeepSeek', qwen: 'Qwen' }[cfg.textProvider] || 'Gemini';
+  if (who === 'Gemini') return geminiError(error);
+  // A space between Chinese and a Latin name, none between two Chinese words.
+  const name = who === 'Qwen' ? '千问' : 'DeepSeek', [before, after] = who === 'Qwen' ? ['', ''] : [' ', ' '];
+  if (new RegExp(`^${who} HTTP (401|403)$`).test(error.message)) return `${name}${after}没有接受请求：key 不对，或者没有这个模型的权限。`;
+  if (error.message === `${who} HTTP 402`) return `${name}${after}账户余额不足，充值后可以重试。`;
+  if (error.message === `${who} HTTP 429`) return `${name}${after}请求太频繁，稍后再试。`;
+  if (error.message === `${who} network error or timeout`) return `${name}${after}暂时连接不上或等待超时，可以重试。`;
+  return `这次未取得有效的${before}${name}${after}内容，可以重试。`;
 }
