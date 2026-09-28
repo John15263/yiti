@@ -88,3 +88,6 @@ dialog#settings::backdrop{background:rgba(30,40,36,.25)}
 #settings .settings-result .ok{color:var(--good)}#settings .settings-result .bad{color:#a04630}
 
 @media (max-width:560px){header,main{padding-left:16px;padding-right:16px}#settings .field{grid-template-columns:1fr}#settings .field .muted{grid-column:1}}
+#variant{margin:18px 0 0;padding:14px 0 0;border-top:1px solid #e3e8eb}
+#variant-question{white-space:pre-wrap}
+#variant-solution{white-space:pre-wrap;font-size:15px;line-height:1.85;padding-bottom:14px}

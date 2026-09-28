@@ -72,6 +72,19 @@
         </div>
       </div>
 
+      <!-- 换个样子：同一个关键一步，换个情境再做一题；课的最后一步还有本课回顾。 -->
+      <div id="variant" hidden>
+        <p id="variant-title" class="eyebrow"></p>
+        <p id="variant-question" class="focus" hidden></p>
+        <textarea id="variant-text" rows="3" spellcheck="false" autocomplete="off" placeholder="写出算式和答案，只写答案也行" hidden></textarea>
+        <ol id="variant-hints" class="hints"></ol>
+        <div id="variant-checked" hidden>
+          <p class="verdict-line"><b id="variant-verdict"></b><span id="variant-note"></span></p>
+          <p id="variant-fixed" class="fixed" hidden></p>
+        </div>
+        <div id="variant-solution" class="original" hidden></div>
+      </div>
+
       <div id="bar" class="bar">
         <button id="primary" class="primary" hidden></button>
         <span id="links" class="links"></span>

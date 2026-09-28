@@ -15,7 +15,7 @@ const PRICES = [
   { prefix: 'gemini-3.5-flash-lite', text_in: 0.30, text_out: 2.50, audio_in: 0.30 },
 ];
 export const PURPOSES = {
-  prepare: '例题拆块', translate: '翻译', check: '默写检查', say: '一句点评', voice_learn: '语音讲解', voice_check: '检查讲解', voice_say: '点评讲解', voice_write: '语音陪练（默写）', voice_prereq: '前置知识（交答案前）',
+  prepare: '例题拆块', translate: '翻译', check: '默写检查', say: '一句点评', variant_make: '变式出题', variant_check: '变式检查', voice_learn: '语音讲解', voice_check: '检查讲解', voice_say: '点评讲解', voice_write: '语音陪练（默写）', voice_prereq: '前置知识（交答案前）',
 };
 
 const count = value => Number.isInteger(value) && value > 0 ? value : 0;

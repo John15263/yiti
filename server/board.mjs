@@ -38,8 +38,9 @@ export class Board {
   current() { return this.store.get('current'); }
   record(key) { return this.store.step(key); }
   state() {
-    const current = this.current();
-    return { current, record: current?.key ? this.store.step(current.key) : null };
+    const current = this.current(), record = current?.key ? this.store.step(current.key) : null;
+    // The lesson's 换个样子 round, once asked for on its last step.
+    return { current, record, review: record ? this.store.get(`review:${record.task}`) : null };
   }
   // Only the step being followed can be changed, so a page left on an old step never writes over it.
   active(key) {

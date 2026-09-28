@@ -7,7 +7,7 @@ import { request, subscribe } from './backend.js';
 const $ = id => document.getElementById(id);
 const KIND = { tutorial: '讲解', example: '例题', question: '练习题' };
 const PAGES = { quiz: '测验', review: '复习', multistep: '多步题', diagnostic: '诊断', assessment: '测评' };
-let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnSay = '', drawnExplain = '', explainOpen = false;
+let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnSay = '', drawnExplain = '', drawnVariant = '', explainOpen = false;
 const asked = new Set();
 const record = () => state?.record || null;
 
@@ -73,22 +73,23 @@ function render(next) {
     voice.update(); return;
   }
   show('step');
-  if (rec.key !== shownKey) { shownKey = rec.key; drawnContext = ''; drawnBlock = ''; drawnSay = ''; drawnExplain = ''; explainOpen = false; }
+  if (rec.key !== shownKey) { shownKey = rec.key; drawnContext = ''; drawnBlock = ''; drawnSay = ''; drawnExplain = ''; drawnVariant = ''; explainOpen = false; }
   const notes = [];
   translation(rec, next.gemini, notes);
   // A question's own title is only "Question 2"; the step counter already says that.
   const title = rec.step.type === 'question' ? '' : shown(rec).title;
   $('step-title').textContent = title; $('step-title').hidden = !title;
   renderContext(rec);
-  for (const id of ['blocks', 'ask', 'say']) $(id).hidden = true;
+  for (const id of ['blocks', 'ask', 'say', 'variant']) $(id).hidden = true;
   const actions = learnable(rec) ? renderLearnable(rec, next.gemini, notes) : rec.step.type === 'question' ? renderQuestion(rec) : {};
+  const variantActions = renderVariants(rec, next, actions);
   // Waiting and errors for the whole step share one quiet line; an error can be clicked to try again.
   const retry = notes.find(n => n.retry);
   $('status-line').textContent = notes.map(n => n.text).join(' · ');
   $('status-line').hidden = !notes.length;
   $('status-line').disabled = !retry;
   $('status-line').onclick = retry ? retry.retry : null;
-  bar(actions);
+  bar(variantActions || actions);
   voice.update();
 }
 
@@ -233,6 +234,91 @@ function renderQuestion(rec) {
     status: running ? '正在点评…' : last?.status === 'error' ? last.error : '' };
 }
 
+// 换个样子: once the key step of an answered question has been reviewed, the same key step in a question with
+// another setting and other numbers, worked here; on the lesson's last step, every key step once more.
+const VERDICT = { right: ['✓ 对了', 'pass'], slip: ['关键一步对了，算的地方再看看', 'adjust'], wrong: ['还差一点', 'adjust'] };
+const openRound = set => set?.status === 'running' || (set?.status === 'ready' && set.items.some(i => i.status === 'open'));
+function renderVariants(rec, st, own) {
+  if (learnable(rec) && rec.prep?.status === 'ready' && rec.progress.phase !== 'done') return null;
+  const said = rec.step.type === 'question' && !!rec.sections.result && rec.say.attempts.some(a => a.status === 'done');
+  const v = rec.variant, lesson = rec.step.index + 1 === rec.step.total ? st.review : null;
+  // Asked for by itself once the key step is reviewed: the learner is still here, working on this question.
+  if (said && !v && st.gemini) {
+    const ask = `v:${rec.key}`;
+    if (!asked.has(ask)) { asked.add(ask); void post('/api/variant', { key: rec.key }); }
+    return showVariant(rec, { status: 'running' }, 1, own);
+  }
+  if (said && v && (openRound(v) || v.status === 'error')) return showVariant(rec, v, 1, own);
+  if (lesson) return showVariant(rec, lesson, 2, own);
+  if (st.lesson_ready) {
+    $('variant').hidden = false; $('variant-title').textContent = '本课回顾';
+    for (const id of ['variant-text', 'variant-checked', 'variant-solution']) $(id).hidden = true;
+    $('variant-hints').replaceChildren();
+    $('variant-question').hidden = false; $('variant-question').textContent = '这节课做过的关键一步，每个再换个样子做一题，顺序打乱。';
+    return { primary: { label: '开始本课回顾  ⌘↵', run: () => void post('/api/variant/lesson', { key: rec.key }) }, links: own.links || [] };
+  }
+  return said && v ? showVariant(rec, v, 1, own) : null;
+}
+function showVariant(rec, set, round, own) {
+  $('variant').hidden = false;
+  const title = round === 1 ? '换个样子 · 同一个关键一步' : '本课回顾 · 换个样子';
+  for (const id of ['variant-question', 'variant-text', 'variant-checked', 'variant-fixed', 'variant-solution']) $(id).hidden = true;
+  $('variant-hints').replaceChildren(); $('variant-title').textContent = title;
+  const resay = round === 1 ? [{ label: '重交关键一步', run: submitSay }] : [];
+  if (set.status === 'running') return { links: resay, status: '正在出一道换个样子的题…' };
+  if (set.status === 'error') return { links: [{ label: '重新出题', run: () => void post(round === 1 ? '/api/variant' : '/api/variant/lesson', { key: rec.key }) }, ...resay], status: set.error };
+  const item = set.items[set.index], count = set.items.length, finished = !openRound(set);
+  if (round === 2) $('variant-title').textContent = `${title} · ${set.index + 1} / ${count}`;
+  $('variant-question').hidden = false; $('variant-question').textContent = lang === 'zh' ? item.question_zh : item.question_en;
+  const box = $('variant-text'), sig = `${rec.key}:${round}:${item.id}`;
+  box.hidden = false; box.disabled = item.status !== 'open';
+  if (drawnVariant !== sig) { drawnVariant = sig; box.value = drafts.get(`${rec.key}:v:${item.id}`) || item.attempts.at(-1)?.text || ''; if (!box.disabled) requestAnimationFrame(() => box.focus()); }
+  const levels = [`刚才那道题的关键一步：${item.key_step}`, item.hint, '解法在下面。'];
+  $('variant-hints').replaceChildren(...levels.slice(0, item.hints).map(h => Object.assign(document.createElement('li'), { textContent: h })));
+  const last = item.attempts.at(-1), running = last?.status === 'running', done = item.attempts.findLast(a => a.status === 'done');
+  const solved = item.status !== 'open' || item.hints >= 3;
+  if (done) {
+    $('variant-checked').hidden = false;
+    $('variant-verdict').textContent = VERDICT[done.verdict][0]; $('variant-verdict').className = VERDICT[done.verdict][1];
+    $('variant-note').textContent = done.note;
+    // A correction written out would give the answer away while it can still be tried again.
+    $('variant-fixed').hidden = !done.fixed || done.fixed === done.text || !(done.verdict === 'right' || solved);
+    $('variant-fixed').textContent = done.fixed;
+  }
+  $('variant-solution').hidden = !solved;
+  $('variant-solution').textContent = `解法\n${item.solution}\n答案：${item.answer}`;
+  if (finished) {
+    const right = set.items.filter(i => i.passed).length;
+    return { links: resay, status: round === 1 ? '做完了。回 Math Academy 点 Continue。' : `本课回顾做完了：${count} 道里做对了 ${right} 道。` };
+  }
+  const ids = { key: rec.key, round, item: item.id };
+  const moveOn = () => { drafts.set(`${rec.key}:v:${item.id}`, ''); void post('/api/variant/next', ids); };
+  const afterCheck = done && box.value.trim() === done.text;
+  const links = [];
+  if (item.hints < 3) links.push({ label: '提示 ⌘[', run: () => void post('/api/variant/hint', ids) });
+  if (!afterCheck) links.push({ label: '跳过', run: moveOn });
+  const primary = afterCheck ? { label: set.index + 1 < count ? '下一题  ⌘↵' : '完成  ⌘↵', run: moveOn }
+    : { label: '检查  ⌘↵', disabled: running, run: () => {
+      const text = box.value.trim();
+      if (!text) { error('先写点什么，再检查。'); return; }
+      void post('/api/variant/check', { ...ids, text });
+    } };
+  return { primary, links: [...links, ...resay], status: running ? '正在检查…' : last?.status === 'error' ? last.error : '' };
+}
+// The variant on screen, if any: which round, and the item being worked on.
+function currentVariant() {
+  const rec = record();
+  if (!rec || $('variant').hidden || $('variant-text').hidden) return null;
+  const lesson = rec.step.index + 1 === rec.step.total ? state.review : null;
+  const set = openRound(rec.variant) || !lesson ? rec.variant : lesson, item = set?.items?.[set.index];
+  return item ? { rec, round: set === rec.variant ? 1 : 2, item } : null;
+}
+// For the hint key: only while it can still be tried and has hints left.
+function variantIds() {
+  const v = currentVariant();
+  return v && v.item.status === 'open' && v.item.hints < 3 ? { key: v.rec.key, round: v.round, item: v.item.id } : null;
+}
+
 // ── actions ──
 function toWrite() { void command('write'); }
 function skip() { drafts.set(writeDraftKey(record()), ''); void command('next'); }
@@ -264,6 +350,12 @@ $('write-text').addEventListener('input', () => {
   if (!$('primary').hidden) $('primary').textContent = writeLabel(rec);
 });
 $('say-text').addEventListener('input', () => { const rec = record(); if (rec) drafts.set(`${rec.key}:say`, $('say-text').value); });
+$('variant-text').addEventListener('input', () => {
+  const v = currentVariant(); if (!v) return;
+  drafts.set(`${v.rec.key}:v:${v.item.id}`, $('variant-text').value);
+  // The main button turns from moving on back into checking once the text changes.
+  render(state);
+});
 
 addEventListener('keydown', event => {
   const mod = event.metaKey || event.ctrlKey, rec = record();
@@ -272,6 +364,8 @@ addEventListener('keydown', event => {
   const key = event.code === 'BracketRight' ? ']' : event.code === 'BracketLeft' ? '[' : event.key;
   if (key === ']') { event.preventDefault(); voice.toggle(); return; }
   if (key === '[') {
+    const ids = variantIds();
+    if (ids) { event.preventDefault(); void post('/api/variant/hint', ids); return; }
     const p = rec.progress, block = rec.prep?.blocks?.[p?.index];
     if (learnable(rec) && ['write', 'checked'].includes(p.phase) && p.inputs[p.index].hints < block.hints.length) { event.preventDefault(); void command('hint'); }
     return;

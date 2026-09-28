@@ -4,7 +4,7 @@
 
 ## 1. 上传包（Packages）
 
-上传 `dist/yiti-extension-0.3.2.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。2026-09-26 提交审核的是 0.3.1；审核期间不要上传新包（会重新排队），通过后再用新版本更新。
+上传 `dist/yiti-extension-0.3.3.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。2026-09-26 提交审核的是 0.3.1；审核期间不要上传新包（会重新排队），通过后再用新版本更新。
 
 包里的 `edge/_locales/<语言>/messages.json` 决定了商店里**不能再改**的两项，每种语言一份：
 

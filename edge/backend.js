@@ -3,6 +3,7 @@
 // every model is called directly from here. Nothing passes through a server of ours.
 import { Board } from '../server/board.js';
 import { Teach, usePrompts } from '../server/teach.js';
+import { Variants } from '../server/variant.js';
 import { config } from '../server/config.js';
 import { Settings, testServices } from '../server/settings.js';
 import { textConfigured } from '../server/llm.js';
@@ -33,10 +34,11 @@ cfg.usage = {
 };
 
 const listeners = new Set();
-const view = () => ({ ...board.state(), gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build: null });
+const view = () => { const s = board.state(); return { ...s, lesson_ready: variants.offered(s.record), gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build: null }; };
 const publish = () => { const value = view(); for (const listener of listeners) listener(value); };
 const board = new Board(store, publish);
 const teach = new Teach(board, cfg);
+const variants = new Variants(board, cfg);
 
 // Gemini Live takes its key in the address, so a plain socket reaches it; Qwen goes over WebRTC.
 let opened = null;
@@ -56,6 +58,8 @@ export async function request(path, body) {
     if (path === '/api/demo') { board.capture(DEMO); return view(); }
     const action = { '/api/prepare': 'prepare', '/api/translate': 'translate', '/api/check': 'check', '/api/say': 'say' }[path];
     if (action) { teach[action](body); return view(); }
+    const variant = { '/api/variant': 'start', '/api/variant/lesson': 'lesson', '/api/variant/check': 'check', '/api/variant/hint': 'hint', '/api/variant/next': 'next' }[path];
+    if (variant) { variants[variant](body); return view(); }
     if (path === '/api/settings' && body === undefined) return settings.view(cfg);
     if (path === '/api/settings') {
       const values = settings.patch(body);
