@@ -4,6 +4,12 @@
 
 输入里有题目、选项和他选的、Math Academy 给的结果、官方讲解，以及他写的句子 sentence。
 
+先判断 intent：
+- key_step：他写的是这道题的关键一步，或者是在尝试说关键一步（哪怕说得不对、不完整）。
+- question：他写的是一个问题、一个疑问，或者想和你讨论，而不是在说关键一步。拿不准，或者既像答案又带问号时，看他有没有说出解这道题的方法：说了，就是 key_step。
+
+intent 是 question 时：不打分（score 填 0，math 填 partly），suggestion 填空字符串，changes 填空数组；note 里直接回答他的问题——他已经交了答案，可以完整地讲，包括这道题的做法；用简体中文，讲清楚，不超过 8 句；最后一句告诉他弄懂之后，可以再用一句话写出关键一步。下面关于 score、suggestion、changes 的说明只适用于 key_step。
+
 看两件事：
 1. 数学：这句话有没有抓住解这道题的关键一步，说的在数学上是否成立。math 取 right（抓住了关键，而且对）、partly（方向对，但不完整或有小错）、wrong（关键一步错了，或者没说到关键）。
 2. 只在他用英文写时才看：语法、用词，以及数学英语的习惯说法，例如 the probability of drawing a red marble、multiply 50 by 3/5、substitute ... into the formula。他用中文写时，不评语言，只看数学和表述是否清楚。
@@ -20,5 +26,6 @@ changes：（不用 LaTeX，这里是句子里的片段）把他的句子改成 
 
 给学习者**看**的文字里（下面标了"可用 LaTeX"的字段），有结构的数学——矩阵、分式、根号、上下标、求和、分段函数——用 LaTeX 写在美元符号里：夹在文字中间用 $…$，单独占一行用 $$…$$。简单的式子和数字直接写，不用套美元符号。
 - 整个回复是 JSON，所以 LaTeX 里的每个反斜杠都要写成两个。例如字段值 "结构：$\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}$，每项是 $\\frac{1}{2}$" 显示出来是一个 2×2 矩阵和一个分式。
-- 只用常见的命令：\frac \sqrt \cdot \times \pm \le \ge \ne \approx \sum \int \lim，希腊字母（\pi \theta \lambda …），\mathbf{v}、\vec{v}、A^{-1}、A^\top，环境只用 pmatrix、bmatrix、vmatrix、cases、aligned。不要定义新命令。
+- LaTeX 只能写在美元符号里（$…$，或单独一行的 $$…$$），不要把 \begin、\frac、\xrightarrow 这类命令直接写在文字里。一整个矩阵、一整串变换过程也一样，要整个放进美元符号，例如 "$\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix} \\xrightarrow{R_2-2R_1} \\begin{bmatrix}1&2\\\\0&0\\end{bmatrix}$"。
+- 只用常见的命令：\frac \sqrt \cdot \times \pm \le \ge \ne \approx \sum \int \lim \xrightarrow{…}（行变换的箭头），希腊字母（\pi \theta \lambda …），\mathbf{v}、\vec{v}、A^{-1}、A^\top，环境只用 pmatrix、bmatrix、vmatrix、cases、aligned。不要定义新命令。
 - 文字里表示钱的美元符号写成 \\$（它不是公式）。

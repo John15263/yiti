@@ -7,6 +7,7 @@ import { Board } from './board.mjs';
 import { Teach } from './teach.mjs';
 import { Variants } from './variant.mjs';
 import { Prereqs } from './prereq.mjs';
+import { Chats } from './chat.mjs';
 import './prompts-node.mjs';
 import { Voice } from './voice.mjs';
 import { Usage } from './usage.mjs';
@@ -37,6 +38,7 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   const teach = new Teach(board, cfg, infer);
   const variants = new Variants(board, cfg, infer);
   const prereqs = new Prereqs(board, cfg, infer);
+  const chats = new Chats(board, cfg, infer);
   const voice = new Voice(board, cfg, connect);
   const sockets = new Set();
   const equal = value => typeof value === 'string' && Buffer.byteLength(value) === Buffer.byteLength(token) && timingSafeEqual(Buffer.from(value), Buffer.from(token));
@@ -105,6 +107,9 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
       if (req.method === 'POST') {
         if (path === '/api/command') { board.command(await body(req)); return json(res, view()); }
         if (path === '/api/prereq') { prereqs.start(await body(req)); return json(res, view()); }
+        if (path === '/api/chat') { chats.send(await body(req)); return json(res, view()); }
+        if (path === '/api/chat/retry') { chats.retry(await body(req)); return json(res, view()); }
+        if (path === '/api/prereq/expand') { prereqs.expand(await body(req)); return json(res, view()); }
         // The example written for 一题 itself, followed as if it were open on Math Academy.
         if (path === '/api/demo') { await body(req); board.capture(DEMO); return json(res, view()); }
         const action = { '/api/prepare': 'prepare', '/api/translate': 'translate', '/api/check': 'check', '/api/say': 'say' }[path];
@@ -135,6 +140,6 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   });
   server.requestTimeout = 20000;
   server.headersTimeout = 10000;
-  return { server, board, teach, variants, prereqs, voice, usage, token,
+  return { server, board, teach, variants, prereqs, chats, voice, usage, token,
     closeStreams: () => { for (const res of streams) res.end(); for (const conn of sockets) conn.close(1001, 'Server stopping'); } };
 }

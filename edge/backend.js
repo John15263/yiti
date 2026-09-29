@@ -5,6 +5,7 @@ import { Board } from '../server/board.js';
 import { Teach, usePrompts } from '../server/teach.js';
 import { Variants } from '../server/variant.js';
 import { Prereqs } from '../server/prereq.js';
+import { Chats } from '../server/chat.js';
 import { config } from '../server/config.js';
 import { Settings, testServices } from '../server/settings.js';
 import { textConfigured } from '../server/llm.js';
@@ -41,6 +42,7 @@ const board = new Board(store, publish);
 const teach = new Teach(board, cfg);
 const variants = new Variants(board, cfg);
 const prereqs = new Prereqs(board, cfg);
+const chats = new Chats(board, cfg);
 
 // Gemini Live takes its key in the address, so a plain socket reaches it; Qwen goes over WebRTC.
 let opened = null;
@@ -58,6 +60,9 @@ export async function request(path, body) {
     if (path === '/api/state') return view();
     if (path === '/api/command') { board.command(body); return view(); }
     if (path === '/api/prereq') { prereqs.start(body); return view(); }
+    if (path === '/api/prereq/expand') { prereqs.expand(body); return view(); }
+    if (path === '/api/chat') { chats.send(body); return view(); }
+    if (path === '/api/chat/retry') { chats.retry(body); return view(); }
     if (path === '/api/demo') { board.capture(DEMO); return view(); }
     const action = { '/api/prepare': 'prepare', '/api/translate': 'translate', '/api/check': 'check', '/api/say': 'say' }[path];
     if (action) { teach[action](body); return view(); }

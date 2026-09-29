@@ -17,7 +17,7 @@ export function voiceMode(rec) {
   if (!rec?.step) return null;
   if (rec.step.type === 'question') {
     if (!rec.sections?.result) return { mode: 'prereq', key: `prereq:${rec.key}` };
-    const done = rec.say?.attempts?.findLast(a => a.status === 'done');
+    const done = rec.say?.attempts?.findLast(a => a.status === 'done' && a.intent !== 'question');
     return { mode: 'say', key: `say:${rec.key}:${done?.id || 'open'}` };
   }
   if (!learnable(rec) || rec.prep?.status !== 'ready') return null;

@@ -13,7 +13,7 @@ const UPPER = { Gamma: 'Γ', Delta: 'Δ', Theta: 'Θ', Lambda: 'Λ', Xi: 'Ξ', P
 const IDENT = { infty: '∞', partial: '∂', nabla: '∇', emptyset: '∅', varnothing: '∅', ell: 'ℓ', hbar: 'ℏ', top: '⊤', ldots: '…', dots: '…', cdots: '⋯', vdots: '⋮', ddots: '⋱', prime: '′', degree: '°' };
 const SYMBOL = { cdot: '⋅', times: '×', div: '÷', pm: '±', mp: '∓', le: '≤', leq: '≤', ge: '≥', geq: '≥', ne: '≠', neq: '≠', approx: '≈', equiv: '≡',
   sim: '∼', simeq: '≃', propto: '∝', in: '∈', notin: '∉', ni: '∋', subset: '⊂', subseteq: '⊆', supset: '⊃', supseteq: '⊇', cup: '∪', cap: '∩',
-  to: '→', rightarrow: '→', leftarrow: '←', leftrightarrow: '↔', Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔', implies: '⟹', iff: '⟺', mapsto: '↦',
+  to: '→', rightarrow: '→', leftarrow: '←', leftrightarrow: '↔', Rightarrow: '⇒', Leftarrow: '⇐', Leftrightarrow: '⇔', implies: '⟹', iff: '⟺', mapsto: '↦', longrightarrow: '⟶', longleftarrow: '⟵', Longrightarrow: '⟹', Longleftarrow: '⟸', uparrow: '↑', downarrow: '↓',
   forall: '∀', exists: '∃', neg: '¬', land: '∧', lor: '∨', wedge: '∧', vee: '∨', oplus: '⊕', otimes: '⊗', circ: '∘', bullet: '∙', ast: '∗', star: '⋆',
   perp: '⊥', parallel: '∥', angle: '∠', triangle: '△', mid: '∣', ll: '≪', gg: '≫', setminus: '∖', dagger: '†',
   langle: '⟨', rangle: '⟩', lbrace: '{', rbrace: '}', lvert: '|', rvert: '|', vert: '|', lVert: '‖', rVert: '‖', Vert: '‖', lfloor: '⌊', rfloor: '⌋', lceil: '⌈', rceil: '⌉' };
@@ -41,6 +41,9 @@ const styled = (ml, kind) => ml.replace(/<(mi|mn)>([^<]*)<\/\1>/g, (all, tag, te
 
 const mrow = nodes => { const parts = nodes.filter(n => n.ml); return parts.length === 1 ? parts[0].ml : `<mrow>${parts.map(n => n.ml).join('')}</mrow>`; };
 const space = width => `<mspace width="${width}"/>`;
+
+// The MathML of a piece of TeX, without its <math> wrapper: what goes inside an element of a larger formula.
+const inner = tex => new Parser(tex, false).run().slice('<math>'.length, -'</math>'.length);
 
 class Parser {
   constructor(src, display) { this.s = src; this.i = 0; this.display = display; this.depth = 0; this.fractions = 0; }
@@ -192,13 +195,25 @@ class Parser {
         const fraction = `<mfrac>${top}${bottom}</mfrac>`;
         return { ml: outer ? `<mstyle displaystyle="true" scriptlevel="0">${fraction}</mstyle>` : fraction };
       }
+      case 'xrightarrow': case 'xleftarrow': {
+        this.skip();
+        let below = null;
+        if (s[this.i] === '[') {
+          const end = s.indexOf(']', this.i);
+          if (end < 0) this.fail('unterminated label');
+          below = inner(s.slice(this.i + 1, end));
+          this.i = end + 1;
+        }
+        const above = this.arg(), arrow = `<mo>${name === 'xrightarrow' ? '→' : '←'}</mo>`;
+        return { ml: below ? `<munderover>${arrow}${below}${above}</munderover>` : `<mover>${arrow}${above}</mover>` };
+      }
       case 'binom': case 'dbinom': return { ml: `<mrow><mo>(</mo><mfrac linethickness="0">${this.arg()}${this.arg()}</mfrac><mo>)</mo></mrow>` };
       case 'sqrt': {
         this.skip();
         if (s[this.i] === '[') {
           const end = s.indexOf(']', this.i);
           if (end < 0) this.fail('unterminated root index');
-          const index = new Parser(s.slice(this.i + 1, end), false).run().slice('<math>'.length, -'</math>'.length);
+          const index = inner(s.slice(this.i + 1, end));
           this.i = end + 1;
           return { ml: `<mroot>${this.arg()}${index}</mroot>` };
         }
@@ -294,10 +309,33 @@ function scan(text, mending = false) {
   }
   return spans;
 }
+// A model sometimes writes LaTeX without the dollar signs (a whole matrix, or a chain of them joined by an arrow).
+// A backslash command, or a \begin…\end, standing in the text is taken for math when it can be drawn; two of them
+// with nothing but blanks between are one formula. Anything that cannot be drawn is left as it was written.
+const BARE = /\\begin\{([A-Za-z*]+)\}[\s\S]*?\\end\{\1\}|\\[A-Za-z]+(?:\[[^\]]*\])?(?:\{(?:[^{}]|\{[^{}]*\})*\})*/g;
+function bare(text) {
+  const runs = [];
+  for (const m of text.matchAll(BARE)) {
+    const last = runs.at(-1);
+    if (last && /^\s*$/.test(text.slice(last.to, m.index))) last.to = m.index + m[0].length;
+    else runs.push({ from: m.index, to: m.index + m[0].length });
+  }
+  const parts = [];
+  let at = 0;
+  for (const { from, to } of runs) {
+    const tex = text.slice(from, to);
+    if (!texToMathML(tex)) continue;
+    if (from > at) parts.push({ t: 'text', v: text.slice(at, from) });
+    parts.push({ t: 'math', tex, display: false });
+    at = to;
+  }
+  if (at < text.length) parts.push({ t: 'text', v: text.slice(at) });
+  return parts;
+}
 export function splitMath(text) {
   const parts = [];
   let at = 0;
-  const plain = (a, b) => { const v = text.slice(a, b).replace(/\\\$/g, '$'); if (v) parts.push({ t: 'text', v }); };
+  const plain = (a, b) => { const v = text.slice(a, b).replace(/\\\$/g, '$'); if (v) parts.push(...bare(v)); };
   for (const { from, to, display } of scan(text)) {
     const open = display ? 2 : 1;
     plain(at, from - open);

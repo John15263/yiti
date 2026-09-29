@@ -71,7 +71,6 @@
       <div id="say" hidden>
         <p class="verdict-line"><b id="say-result"></b><button id="say-explain" class="link"></button><span id="say-prior" class="muted"></span></p>
         <div id="say-explanation" class="original mathtext" hidden></div>
-        <textarea id="say-text" rows="3" spellcheck="true" autocomplete="off" placeholder="一句话说出这道题的关键一步，中文英文都行"></textarea>
         <div id="say-review" hidden>
           <p class="verdict-line"><b id="say-score"></b><span id="say-note"></span></p>
           <p id="say-suggestion" class="fixed"></p>
@@ -90,6 +89,16 @@
           <p id="variant-fixed" class="fixed" hidden></p>
         </div>
         <div id="variant-solution" class="original" hidden></div>
+      </div>
+
+      <!-- 交了答案之后：一个输入框。发送是问一问（多轮，不打分）；「作为关键一步交上去」才是打分点评，之后可以做换个样子。 -->
+      <div id="chat" hidden>
+        <p class="verdict-line"><b>有疑问？问一问</b><span class="muted">交了答案之后，什么都可以问，包括这道题怎么做。</span></p>
+        <p id="chat-note" class="muted" hidden></p>
+        <div id="chat-thread"></div>
+        <textarea id="chat-text" rows="3" spellcheck="true" autocomplete="off" placeholder="问这道题的任何问题…  ⌘↵ 发送"></textarea>
+        <div class="chat-actions"><button id="chat-send">发送  ⌘↵</button><button id="chat-keystep" class="link">作为关键一步交上去</button><span id="chat-status" class="muted"></span></div>
+        <p id="chat-hint" class="muted">想再做一道「换个样子」的题？先用一句话写出这道题的关键一步（中文英文都行），点「作为关键一步交上去」：会打分、点评。</p>
       </div>
 
       <div id="bar" class="bar">

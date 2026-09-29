@@ -12,6 +12,15 @@ function fresh(c, key, hash, at) {
     hash_version: HASH_VERSION, created_at: at, updated_at: at, prep: { status: 'none' }, translation: { status: 'none' }, progress: progress(0), say: { attempts: [] }, voice: [] };
 }
 
+// The conversation about an answered question, kept on its step (至多 MAX_CHAT 条，旧的先丢).
+export const MAX_CHAT = 60;
+export function pushChat(rec, ...messages) {
+  const chat = rec.chat ||= { messages: [], status: 'idle' };
+  for (const m of messages) chat.messages.push({ id: crypto.randomUUID(), at: now(), ...m });
+  chat.messages = chat.messages.slice(-MAX_CHAT);
+  return chat;
+}
+
 // What a lesson teaches, from the tutorials and examples already followed on it: new material is not a prerequisite.
 // With `summaries`, a step that has been split into blocks also says in a sentence what it covered.
 export const lessonTitles = (store, rec, summaries = false) => store.steps()

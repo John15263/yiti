@@ -8,7 +8,7 @@ import { newestOnly } from './order.js';
 const $ = id => document.getElementById(id);
 const KIND = { tutorial: '讲解', example: '例题', question: '练习题' };
 const PAGES = { quiz: '测验', review: '复习', multistep: '多步题', diagnostic: '诊断', assessment: '测评' };
-let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnSay = '', drawnExplain = '', drawnVariant = '', explainOpen = false, prereqOpen = '';
+let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnExplain = '', drawnVariant = '', explainOpen = false, prereqOpen = '', prereqMore = new Set();
 const asked = new Set();
 const record = () => state?.record || null;
 
@@ -76,14 +76,14 @@ function render(next) {
     voice.update(); return;
   }
   show('step');
-  if (rec.key !== shownKey) { shownKey = rec.key; drawnContext = ''; drawnBlock = ''; drawnSay = ''; drawnExplain = ''; drawnVariant = ''; explainOpen = false; }
+  if (rec.key !== shownKey) { shownKey = rec.key; drawnContext = ''; drawnBlock = ''; drawnExplain = ''; drawnVariant = ''; explainOpen = false; }
   const notes = [];
   translation(rec, next.gemini, notes);
   // A question's own title is only "Question 2"; the step counter already says that.
   const title = rec.step.type === 'question' ? '' : shown(rec).title;
   $('step-title').textContent = title; $('step-title').hidden = !title;
   renderContext(rec);
-  for (const id of ['blocks', 'ask', 'prereq', 'say', 'variant']) $(id).hidden = true;
+  for (const id of ['blocks', 'ask', 'prereq', 'say', 'chat', 'variant']) $(id).hidden = true;
   const actions = learnable(rec) ? renderLearnable(rec, next.gemini, notes) : rec.step.type === 'question' ? renderQuestion(rec) : {};
   const variantActions = renderVariants(rec, next, actions);
   // Waiting and errors for the whole step share one quiet line; an error can be clicked to try again.
@@ -203,8 +203,8 @@ function writeLabel(rec) {
 
 // 前置知识: what a question not yet answered rests on, in three kinds; the model's own reference, never this question's working.
 const PREREQ_KINDS = { concept: '基础概念', method: '基础方法', formula: '基础公式' };
-function drawPrereq(p) {
-  const ready = p?.status === 'ready';
+function drawPrereq(rec) {
+  const p = rec.prereq, ready = p?.status === 'ready';
   $('prereq-status').hidden = ready;
   $('prereq-status').textContent = !p || p.status === 'running' ? '正在整理前置知识…' : p.error || '';
   $('prereq-list').replaceChildren(...(ready ? Object.entries(PREREQ_KINDS).flatMap(([kind, title]) => {
@@ -212,9 +212,72 @@ function drawPrereq(p) {
     if (!items.length) return [];
     const heading = document.createElement('h4'), list = document.createElement('ul');
     heading.textContent = title; list.className = 'prereq-items';
-    list.append(...items.map(i => { const li = document.createElement('li'), name = document.createElement('b'), note = document.createElement('span'); rich(name, i.name); rich(note, i.note); li.append(name, note); return li; }));
+    list.append(...items.map(i => prereqItem(rec, i)));
     return [heading, list];
   }) : []));
+}
+// One item of the list, with a link that opens it up (what it is, an example of its own, where it is easy to go wrong).
+function prereqItem(rec, i) {
+  const li = document.createElement('li'), name = document.createElement('b'), note = document.createElement('span'), toggle = document.createElement('button');
+  rich(name, i.name); rich(note, i.note);
+  const open = prereqMore.has(i.id), ask = () => void post('/api/prereq/expand', { key: rec.key, item: i.id });
+  toggle.className = 'link'; toggle.textContent = open ? '收起' : '进一步展开';
+  toggle.onclick = () => { if (open) prereqMore.delete(i.id); else { prereqMore.add(i.id); ask(); } render(state); };
+  li.append(name, note, toggle);
+  if (open) {
+    const box = document.createElement('div'), m = i.more;
+    box.className = 'prereq-more';
+    if (!m || m.status === 'running') box.textContent = '正在展开…';
+    else if (m.status === 'error') {
+      const retry = document.createElement('button');
+      retry.className = 'link'; retry.textContent = '重试'; retry.onclick = ask;
+      box.append(`${m.error} `, retry);
+    } else {
+      for (const [label, text] of [['', m.explain], ['例：', m.example], ['容易错：', m.pitfall]]) {
+        if (!text) continue;
+        const p = document.createElement('p'), body = document.createElement('span');
+        if (label) { const tag = document.createElement('b'); tag.textContent = label; p.append(tag); }
+        rich(body, text); p.append(body); box.append(p);
+      }
+    }
+    li.append(box);
+  }
+  return li;
+}
+// 追问: the conversation about an answered question, and the box to go on with it.
+let drawnChat = '', chatKey = '';
+function drawChat(rec, { routed, reviewing, reviewed }) {
+  const chat = rec.chat || { messages: [], status: 'idle' }, box = $('chat-text');
+  if (chatKey !== rec.key) { chatKey = rec.key; box.value = drafts.get(`${rec.key}:chat`) || ''; }
+  // Handed in as the key step but it was a question: answered here, not scored.
+  $('chat-note').hidden = !routed;
+  $('chat-note').textContent = routed ? '刚才作为关键一步交上去的其实是个问题，不打分，回答在上面。想好了，再写一句关键一步交上去。' : '';
+  $('chat-hint').hidden = reviewed;
+  $('chat-keystep').disabled = reviewing;
+  $('chat-thread').replaceChildren(...chat.messages.map(m => {
+    const row = document.createElement('div'), who = document.createElement('b'), body = document.createElement('span');
+    row.className = `chat-msg ${m.role === 'user' ? 'you' : 'tutor'}`; who.textContent = m.role === 'user' ? '你' : '陪练';
+    rich(body, m.text); row.append(who, body); return row;
+  }));
+  const running = chat.status === 'running', status = $('chat-status');
+  $('chat-send').disabled = running;
+  status.replaceChildren();
+  if (running) status.textContent = '正在想…';
+  else if (reviewing) status.textContent = '正在点评…';
+  else if (chat.status === 'error') {
+    const retry = document.createElement('button');
+    retry.className = 'link'; retry.textContent = '重试'; retry.onclick = () => void post('/api/chat/retry', { key: rec.key });
+    status.append(`${chat.error} `, retry);
+  }
+  // The newest turn comes into view when one was added.
+  const sig = `${rec.key}:${chat.messages.length}:${chat.status}`;
+  if (sig !== drawnChat) { drawnChat = sig; $('chat-thread').lastElementChild?.scrollIntoView({ block: 'nearest' }); }
+}
+function sendChat() {
+  const rec = record(), box = $('chat-text'), text = box.value.trim();
+  if (!rec || !text || rec.chat?.status === 'running') return;
+  box.value = ''; drafts.set(`${rec.key}:chat`, '');
+  void post('/api/chat', { key: rec.key, text }).then(data => { if (!data) { box.value = text; drafts.set(`${rec.key}:chat`, text); } });
 }
 function renderQuestion(rec) {
   const s = rec.sections;
@@ -223,7 +286,7 @@ function renderQuestion(rec) {
     // The list of more basic knowledge, only until the answer is in.
     const p = rec.prereq, open = prereqOpen === rec.key;
     $('prereq').hidden = !open;
-    if (open) drawPrereq(p);
+    if (open) drawPrereq(rec);
     const toggle = () => { prereqOpen = open ? '' : rec.key; render(state); if (!open) void post('/api/prereq', { key: rec.key }); };
     return { links: [{ label: open ? '收起前置知识' : '前置知识', run: toggle },
       ...(open && p?.status === 'error' ? [{ label: '重新整理', run: () => void post('/api/prereq', { key: rec.key }) }] : [])] };
@@ -236,14 +299,14 @@ function renderQuestion(rec) {
   $('say-explanation').hidden = !explainOpen;
   if (explainOpen && drawnExplain !== `${rec.key}:${rec.hash}:${look(rec)}`) { draw($('say-explanation'), shown(rec).sections.explanation); drawnExplain = `${rec.key}:${rec.hash}:${look(rec)}`; }
   // Help asked for before answering is part of what the answer was.
-  const prior = rec.voice.filter(v => v.mode === 'prereq').length + (rec.prereq?.views || 0);
+  const prior = rec.voice.filter(v => v.mode === 'prereq').length + (rec.prereq?.views || 0) + (rec.prereq?.expands || 0);
   $('say-prior').textContent = prior ? `交答案前问过前置知识 ${prior} 次` : '';
-  if (drawnSay !== `${rec.key}:${rec.hash}`) {
-    $('say-text').value = drafts.get(`${rec.key}:say`) || rec.say.attempts.at(-1)?.text || '';
-    drawnSay = `${rec.key}:${rec.hash}`;
-  }
-  const last = rec.say.attempts.at(-1), done = rec.say.attempts.findLast(a => a.status === 'done');
+  // What is written in the one box below is a question (not scored), unless it is handed in as the key step; a question
+  // handed in as the key step is not the key step either, and was answered in the conversation.
+  const last = rec.say.attempts.at(-1), done = rec.say.attempts.findLast(a => a.status === 'done' && a.intent !== 'question');
   $('say-review').hidden = !done;
+  $('chat').hidden = false;
+  drawChat(rec, { routed: last?.status === 'done' && last.intent === 'question' && rec.chat?.messages.at(-1)?.from === 'say', reviewing: last?.status === 'running', reviewed: !!done });
   if (done) {
     $('say-score').textContent = `${done.score} 分 · ${{ right: '抓住了关键', partly: '方向对，还不完整', wrong: '没抓住关键' }[done.math]}`;
     $('say-score').className = done.score >= 85 ? 'pass' : 'adjust';
@@ -256,9 +319,8 @@ function renderQuestion(rec) {
       li.append(del, ' → ', ins, why); return li;
     }));
   }
-  const running = last?.status === 'running';
-  return { primary: { label: done ? '再交一次  ⌘↵' : '提交  ⌘↵', run: submitSay, disabled: running },
-    status: running ? '正在点评…' : last?.status === 'error' ? last.error : '' };
+  // The main button is for the practice question below (if any); this step has none of its own.
+  return { status: last?.status === 'running' ? '正在点评…' : last?.status === 'error' ? last.error : '' };
 }
 
 // 换个样子: once the key step of an answered question has been reviewed, the same key step in a question with
@@ -267,7 +329,7 @@ const VERDICT = { right: ['✓ 对了', 'pass'], slip: ['关键一步对了，�
 const openRound = set => set?.status === 'running' || (set?.status === 'ready' && set.items.some(i => i.status === 'open'));
 function renderVariants(rec, st, own) {
   if (learnable(rec) && rec.prep?.status === 'ready' && rec.progress.phase !== 'done') return null;
-  const said = rec.step.type === 'question' && !!rec.sections.result && rec.say.attempts.some(a => a.status === 'done');
+  const said = rec.step.type === 'question' && !!rec.sections.result && rec.say.attempts.some(a => a.status === 'done' && a.intent !== 'question');
   const v = rec.variant, lesson = rec.step.index + 1 === rec.step.total ? st.review : null;
   // Asked for by itself once the key step is reviewed: the learner is still here, working on this question.
   if (said && !v && st.gemini) {
@@ -291,7 +353,7 @@ function showVariant(rec, set, round, own) {
   const title = round === 1 ? '换个样子 · 同一个关键一步' : '本课回顾 · 换个样子';
   for (const id of ['variant-question', 'variant-text', 'variant-checked', 'variant-fixed', 'variant-solution']) $(id).hidden = true;
   $('variant-hints').replaceChildren(); $('variant-title').textContent = title;
-  const resay = round === 1 ? [{ label: '重交关键一步', run: submitSay }] : [];
+  const resay = round === 1 ? [{ label: '重交关键一步', run: toKeyStep }] : [];
   if (set.status === 'running') return { links: resay, status: '正在出一道换个样子的题…' };
   if (set.status === 'error') return { links: [{ label: '重新出题', run: () => void post(round === 1 ? '/api/variant' : '/api/variant/lesson', { key: rec.key }) }, ...resay], status: set.error };
   const item = set.items[set.index], count = set.items.length, finished = !openRound(set);
@@ -356,12 +418,16 @@ function checkOrNext() {
   if (!text) { error('先写点什么，再检查。'); return; }
   void post('/api/check', { key: rec.key, index: rec.progress.index, text });
 }
+// The box below, handed in as the key step: scored and reviewed (a question written there is answered as one).
 function submitSay() {
-  const rec = record(), text = $('say-text').value.trim();
-  if (!text) { error('先写一句。'); return; }
-  if (text === rec.say.attempts.findLast(a => a.status === 'done')?.text) { error('改一改再交，或者直接回 Math Academy 继续。'); return; }
-  void post('/api/say', { key: rec.key, text });
+  const rec = record(), box = $('chat-text'), text = box.value.trim();
+  if (!text) { box.focus(); error('先在下面的框里写一句关键一步，再点「作为关键一步交上去」。'); return; }
+  if (text === rec.say.attempts.findLast(a => a.status === 'done' && a.intent !== 'question')?.text) { error('改一改再交，或者直接回 Math Academy 继续。'); return; }
+  box.value = ''; drafts.set(`${rec.key}:chat`, '');
+  void post('/api/say', { key: rec.key, text }).then(data => { if (!data) { box.value = text; drafts.set(`${rec.key}:chat`, text); } });
 }
+// To hand the key step in again: to the box.
+function toKeyStep() { $('chat').scrollIntoView({ block: 'center' }); $('chat-text').focus(); error('在下面的框里写好关键一步，再点「作为关键一步交上去」。'); }
 $('primary').onclick = () => primaryRun?.();
 $('update-note').onclick = () => location.reload();
 $('demo-open').onclick = () => void post('/api/demo', {});
@@ -376,7 +442,9 @@ $('write-text').addEventListener('input', () => {
   drafts.set(writeDraftKey(rec), $('write-text').value);
   if (!$('primary').hidden) $('primary').textContent = writeLabel(rec);
 });
-$('say-text').addEventListener('input', () => { const rec = record(); if (rec) drafts.set(`${rec.key}:say`, $('say-text').value); });
+$('chat-send').onclick = sendChat;
+$('chat-keystep').onclick = submitSay;
+$('chat-text').addEventListener('input', () => { const rec = record(); if (rec) drafts.set(`${rec.key}:chat`, $('chat-text').value); });
 $('variant-text').addEventListener('input', () => {
   const v = currentVariant(); if (!v) return;
   drafts.set(`${v.rec.key}:v:${v.item.id}`, $('variant-text').value);
@@ -397,6 +465,7 @@ addEventListener('keydown', event => {
     if (learnable(rec) && ['write', 'checked'].includes(p.phase) && p.inputs[p.index].hints < block.hints.length) { event.preventDefault(); void command('hint'); }
     return;
   }
+  if (event.key === 'Enter' && event.target === $('chat-text')) { event.preventDefault(); sendChat(); return; }
   if (event.key !== 'Enter') return;
   event.preventDefault();
   primaryRun?.();

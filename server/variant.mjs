@@ -25,7 +25,7 @@ export const reviewName = task => `review:${task}`;
 // The key step this question comes back with: the reviewed sentence, which the review rewrites into one that
 // holds (and that catches the key step, when the learner's missed it).
 export function keyStep(rec) {
-  const done = rec.say?.attempts?.findLast(a => a.status === 'done');
+  const done = rec.say?.attempts?.findLast(a => a.status === 'done' && a.intent !== 'question');
   return done ? cut(done.suggestion || done.text, 400) : '';
 }
 const answeredQuestion = rec => rec?.step?.type === 'question' && !!rec.sections?.result;

@@ -89,7 +89,7 @@ export function contextOf(rec, mode = voiceMode(rec), lesson = []) {
       ...(s.choices?.length ? { 选项: s.choices.map(c => `${c.letter}. ${parasText(c.content)}`) } : {}) };
   }
   if (mode.mode === 'say') {
-    const s = rec.sections, a = rec.say.attempts.findLast(x => x.status === 'done');
+    const s = rec.sections, a = rec.say.attempts.findLast(x => x.status === 'done' && x.intent !== 'question');
     return { ...common, 题目: parasText(s.question),
       ...(s.choices?.length ? { 选项: s.choices.map(c => `${c.letter}. ${parasText(c.content)}${c.picked ? '  ← 他选的' : ''}`) } : {}),
       结果: s.result, 官方讲解: parasText(s.explanation),

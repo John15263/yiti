@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../server/store.mjs';
 import { Board } from '../server/board.mjs';
-import { Prereqs, itemsOf, unanswered } from '../server/prereq.mjs';
+import { Prereqs, itemsOf, moreOf, unanswered } from '../server/prereq.mjs';
 import '../server/prompts-node.mjs';
 
 const text = v => ({ t: 'text', v });
@@ -131,4 +131,79 @@ test('a restart marks a list that was being made, and nothing is asked without a
   bare.board.capture(question(false));
   assert.throws(() => bare.prereqs.start({ key: KEY }), e => e.status === 503);
   assert.equal(bare.calls.length, 0);
+});
+
+// Opening up one item of the list.
+const more = { explain: '把整体分成相等的份，取其中几份。', example: '一块饼分成 4 份，吃 1 份就是 $\\frac{1}{4}$。', pitfall: '分母越大，每一份越小。' };
+async function listed(extra = {}) {
+  const calls = [];
+  const kit = setup(n => n === 1 ? { items: good } : more, { calls, ...extra });
+  kit.board.capture(example); kit.board.capture(question(false, ['one fifth', 'five sixths']));
+  kit.prereqs.start({ key: KEY }); await settle();
+  return { ...kit, item: status(kit.board).items[0] };
+}
+
+test('an item opened up shows the model the item and what the lesson teaches, never the question', async () => {
+  const { board, prereqs, calls, item } = await listed();
+  assert.ok(item.id && item.kind === 'concept');
+  prereqs.expand({ key: KEY, item: item.id }); assert.equal(status(board).items[0].more.status, 'running');
+  await settle();
+  const { packet, opts } = calls[1];
+  assert.deepEqual(Object.keys(packet).sort(), ['知识点', '这节课在教'].sort());
+  assert.deepEqual(packet.知识点, { 类别: '基础概念', 名称: '分数', 说明: '把整体分成相等的份。' });
+  assert.ok(!JSON.stringify(packet).includes('one half') && !JSON.stringify(packet).includes('one fifth'), 'nothing of the question or its choices');
+  assert.equal(opts.purpose, 'prereq_expand');
+  assert.match(opts.instructions, /不讲任何具体的题怎么做/);
+  const opened = status(board).items[0].more;
+  assert.equal(opened.status, 'ready'); assert.equal(opened.example, more.example); assert.equal(opened.pitfall, more.pitfall);
+});
+
+test('an item already opened is shown again without another call, and every ask is counted', async () => {
+  const { board, prereqs, calls, item } = await listed();
+  prereqs.expand({ key: KEY, item: item.id }); await settle();
+  prereqs.expand({ key: KEY, item: item.id }); prereqs.expand({ key: KEY, item: item.id });
+  assert.equal(calls.length, 2, 'the list, and the one item');
+  assert.equal(status(board).expands, 3);
+  assert.equal(status(board).items[1].more, undefined, 'other items are untouched');
+});
+
+test('an item can only be opened before the answer, from the list on screen', async () => {
+  const { board, prereqs, item } = await listed();
+  assert.throws(() => prereqs.expand({ key: KEY, item: 'not-in-the-list' }), e => e.status === 409);
+  assert.throws(() => prereqs.expand({ key: KEY, item: item.id, extra: 1 }));
+  board.capture(question(true));                        // the answer goes in on Math Academy
+  assert.throws(() => prereqs.expand({ key: KEY, item: item.id }), e => e.status === 409, 'not once answered');
+  const fresh = setup({ items: good });
+  fresh.board.capture(question(false));
+  assert.throws(() => fresh.prereqs.expand({ key: KEY, item: 'x' }), e => e.status === 409, 'no list yet');
+});
+
+test('a failed opening can be tried again, and a reply with no explanation is an error', async () => {
+  const calls = [];
+  const kit = setup(n => n === 1 ? { items: good } : n === 2 ? new Error('Gemini HTTP 429') : n === 3 ? { explain: '', example: 'x', pitfall: '' } : more, { calls });
+  kit.board.capture(question(false)); kit.prereqs.start({ key: KEY }); await settle();
+  const id = status(kit.board).items[0].id, first = () => status(kit.board).items[0].more;
+  kit.prereqs.expand({ key: KEY, item: id }); await settle();
+  assert.equal(first().status, 'error'); assert.match(first().error, /Gemini/);
+  kit.prereqs.expand({ key: KEY, item: id }); await settle();
+  assert.equal(first().status, 'error', 'nothing usable');
+  kit.prereqs.expand({ key: KEY, item: id }); await settle();
+  assert.equal(first().status, 'ready'); assert.equal(calls.length, 4);
+  assert.deepEqual(moreOf({ explain: ' a ', example: 5, pitfall: null }), { explain: 'a', example: '', pitfall: '' });
+  assert.equal(moreOf(null), null);
+});
+
+test('TeX in an opened item has its backslashes put back, and a restart marks one being made', async () => {
+  const { store, board, prereqs, item } = await listed();
+  const tex = { explain: '$\frac{a}{b}$ 是分数', example: '$1\neq 2$', pitfall: '' };
+  const kit = setup(n => n === 1 ? { items: good } : tex);
+  kit.board.capture(question(false)); kit.prereqs.start({ key: KEY }); await settle();
+  kit.prereqs.expand({ key: KEY, item: status(kit.board).items[0].id }); await settle();
+  assert.equal(status(kit.board).items[0].more.explain, '$\\frac{a}{b}$ 是分数');
+  assert.equal(status(kit.board).items[0].more.example, '$1\\neq 2$');
+  const rec = board.record(KEY); rec.prereq.items[0].more = { status: 'running', id: 'x' }; store.putStep(rec);
+  new Prereqs(board, { geminiKey: 'k' }, async () => { throw new Error('never'); });
+  assert.equal(board.record(KEY).prereq.items[0].more.status, 'error');
+  assert.match(board.record(KEY).prereq.items[0].more.error, /重启/);
+  void prereqs; void item;
 });

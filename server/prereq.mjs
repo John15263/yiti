@@ -1,4 +1,4 @@
-import { check, fields } from './validation.mjs';
+import { check, fields, id } from './validation.mjs';
 import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
 import { parasText } from './capture.mjs';
 import { prompt, cut } from './teach.mjs';
@@ -15,6 +15,15 @@ const MAX_ITEMS = 6;
 export const PREREQ_SCHEMA = { type: 'object', additionalProperties: false, required: ['items'], properties: { items: { type: 'array', items: {
   type: 'object', additionalProperties: false, required: ['kind', 'name', 'note'],
   properties: { kind: { type: 'string', enum: KINDS }, name: { type: 'string' }, note: { type: 'string' } } } } } };
+
+// One item of the list, opened up: what it is, a small example of its own, and where it is easy to go wrong.
+export const EXPAND_SCHEMA = { type: 'object', additionalProperties: false, required: ['explain', 'example', 'pitfall'],
+  properties: { explain: { type: 'string' }, example: { type: 'string' }, pitfall: { type: 'string' } } };
+const KIND_NAMES = { concept: '基础概念', method: '基础方法', formula: '基础公式' };
+export function moreOf(value) {
+  const more = { explain: cut(value?.explain, 700), example: cut(value?.example, 500), pitfall: cut(value?.pitfall, 400) };
+  return more.explain ? more : null;
+}
 
 export const unanswered = rec => rec?.step?.type === 'question' && !rec.sections?.result;
 const choicesOf = rec => (rec.sections.choices || []).map(c => `${c.letter}. ${parasText(c.content)}`);
@@ -34,7 +43,7 @@ export function itemsOf(raw, rec) {
     if (!KINDS.includes(it?.kind)) continue;
     const name = cut(it.name, 80), note = cut(it.note, 200), same = name.toLowerCase().replace(/\s+/g, '');
     if (!name || !note || seen.has(same) || choices.some(c => name.includes(c) || note.includes(c))) continue;
-    seen.add(same); items.push({ kind: it.kind, name, note });
+    seen.add(same); items.push({ id: crypto.randomUUID(), kind: it.kind, name, note });
   }
   return items.slice(0, MAX_ITEMS).sort((a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind));
 }
@@ -44,7 +53,10 @@ export class Prereqs {
     this.board = board; this.cfg = cfg; this.infer = infer;
     // A call cut off by a restart is never replayed; it is marked so it can be tried again.
     for (const rec of board.store.steps()) {
-      if (rec.prereq?.status === 'running') { rec.prereq = { ...rec.prereq, status: 'error', error: '服务重启，整理前置知识中断了，可以重试。' }; board.store.putStep(rec); }
+      let touched = false;
+      if (rec.prereq?.status === 'running') { rec.prereq = { ...rec.prereq, status: 'error', error: '服务重启，整理前置知识中断了，可以重试。' }; touched = true; }
+      for (const item of rec.prereq?.items || []) if (item.more?.status === 'running') { item.more = { ...item.more, status: 'error', error: '服务重启，展开中断了，可以重试。' }; touched = true; }
+      if (touched) board.store.putStep(rec);
     }
   }
   // Asked for by the learner, for the question on screen. Every ask is counted (it is part of what the answer was),
@@ -74,6 +86,36 @@ export class Prereqs {
       const latest = this.board.record(rec.key);
       if (latest?.prereq?.id === started && latest.prereq.status === 'running') { latest.prereq = { ...latest.prereq, status: 'error', error: textError(error, this.cfg) }; this.board.save(latest); }
     });
+    return rec;
+  }
+  // One item opened up, asked for by the learner. The model is shown the item and what the lesson teaches, and
+  // never the question: it cannot lean towards this question's working when it does not know the question.
+  // Each ask is counted like the list itself, and an item already opened is shown again without a new call.
+  expand(body) {
+    fields(body, ['key', 'item'], ['key', 'item']); id(body.item);
+    const rec = this.board.active(body.key);
+    check(unanswered(rec), '前置知识只在交答案之前提供。', 409);
+    const list = rec.prereq, item = list?.status === 'ready' ? list.items.find(i => i.id === body.item) : null;
+    check(item, '这份前置知识清单已经变了，页面会刷新。', 409);
+    list.expands = (list.expands || 0) + 1;
+    if (['running', 'ready'].includes(item.more?.status)) return this.board.save(rec);
+    check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
+    const started = crypto.randomUUID(), lesson = lessonTitles(this.board.store, rec, true);
+    item.more = { status: 'running', id: started, started_at: now() };
+    this.board.save(rec);
+    const packet = { 知识点: { 类别: KIND_NAMES[item.kind], 名称: item.name, 说明: item.note }, ...(lesson.length ? { 这节课在教: lesson } : {}) };
+    const settle = change => {
+      const latest = this.board.record(rec.key), at = latest?.prereq?.items?.find(i => i.id === item.id);
+      if (at?.more?.id !== started || at.more.status !== 'running') return;
+      at.more = { ...at.more, ...change };
+      this.board.save(latest);
+    };
+    Promise.resolve().then(async () => {
+      const { value, model } = await this.infer(packet, { instructions: prompt('prereq-expand'), schema: EXPAND_SCHEMA, purpose: 'prereq_expand', key: rec.key, tokens: 4096, limit: 8000 });
+      const more = moreOf(value);
+      check(more, 'Invalid model response');
+      settle({ status: 'ready', model, ...more, finished_at: now() });
+    }).catch(error => settle({ status: 'error', error: textError(error, this.cfg) }));
     return rec;
   }
 }

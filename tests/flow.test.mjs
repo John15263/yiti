@@ -32,6 +32,8 @@ function fakeInfer(calls) {
       { start: 2, meaning: 'duplicate start is dropped', focus: '', answer: '', terms: [], hints: [] },
       { start: 4, meaning: '结论', focus: '写出结果', answer: '48', terms: [], hints: [] }] } };
     if (opts.purpose === 'check') return { model: 'fake', value: { verdict: packet.written.includes('P') ? 'pass' : 'adjust', note: 'ok', fixed: 'n * P' } };
+    if (opts.purpose === 'chat') return { model: 'fake', value: { reply: '好的，接着说。' } };
+    if (opts.purpose === 'prereq_expand') return { model: 'fake', value: { explain: '概率是可能性的大小。', example: '抛硬币，正面的概率是 1/2。', pitfall: '' } };
     if (opts.purpose === 'prereq') return { model: 'fake', value: { items: [{ kind: 'concept', name: '概率', note: '事件发生的可能性有多大。' }] } };
     if (opts.purpose === 'say') return { model: 'fake', value: { score: 88, math: 'right', note: '成立', suggestion: 'Multiply 50 by 3/5.', changes: [{ from: 'multiple', to: 'multiply', why: '动词' }] } };
     throw new Error('unexpected');
@@ -126,6 +128,48 @@ test('a question gets nothing until it is answered, then one sentence is reviewe
   assert.equal(rec.say.attempts[0].changes[0].to, 'multiply');
 });
 
+test('a question written where the key step goes is answered in the conversation, and is neither scored nor the key step', async t => {
+  const infer = async (packet, opts) => {
+    if (opts.purpose === 'say') return { model: 'fake', value: packet.sentence.includes('？')
+      ? { intent: 'question', score: 0, math: 'partly', note: '因为要先通分，分母一样才能直接加。弄懂之后可以再写一句关键一步。', suggestion: '', changes: [] }
+      : { intent: 'key_step', score: 92, math: 'right', note: '抓住了。', suggestion: 'Multiply 50 by 3/5.', changes: [] } };
+    if (opts.purpose === 'variant_make') return { model: 'fake', value: { items: [{ question_en: 'q', question_zh: '题', answer: '1', solution: '解', hint: '提示' }] } };
+    if (opts.purpose === 'chat') return { model: 'fake', value: { reply: '接着说。' } };
+    throw new Error('unexpected ' + opts.purpose);
+  };
+  const { capture, api } = await harness(t, infer);
+  await capture(question(true));
+  const key = '13061309-q360462';
+  await api('/api/say', { key, text: '为什么要通分？' }); await settle();
+  let rec = (await api('/api/state')).body.record;
+  const asked = rec.say.attempts[0];
+  assert.equal(asked.status, 'done'); assert.equal(asked.intent, 'question'); assert.equal(asked.suggestion, '');
+  assert.deepEqual(rec.chat.messages.map(m => [m.role, m.role === 'user' ? m.text : m.text.slice(0, 6)]), [['user', '为什么要通分？'], ['assistant', '因为要先通分']]);
+  assert.equal(voiceMode(rec).key, `say:${key}:open`, 'still waiting for the key step');
+  const early = await api('/api/variant', { key });
+  assert.equal(early.status, 409, 'a question does not start a variant'); assert.match(early.body.error, /关键一步/);
+  // The key step, written afterwards, is scored as before, and the conversation goes on.
+  await api('/api/say', { key, text: 'Multiply 50 by 3/5 to get the number of quarters.' }); await settle();
+  rec = (await api('/api/state')).body.record;
+  assert.equal(rec.say.attempts[1].intent, 'key_step'); assert.equal(rec.say.attempts[1].score, 92);
+  assert.equal(rec.chat.messages.length, 2, 'a key step is not put into the conversation');
+  assert.equal((await api('/api/variant', { key })).status, 200);
+  const sent = await api('/api/chat', { key, text: '还有别的办法吗？' });
+  assert.equal(sent.status, 200); assert.equal(sent.body.record.chat.status, 'running');
+  await settle();
+  assert.deepEqual((await api('/api/state')).body.record.chat.messages.slice(-2).map(m => m.text), ['还有别的办法吗？', '接着说。']);
+  assert.equal((await api('/api/chat/retry', { key })).status, 409, 'nothing failed');
+});
+
+test('the conversation is only for an answered question', async t => {
+  const { capture, api } = await harness(t);
+  await capture(question(false));
+  assert.equal((await api('/api/chat', { key: '13061309-q360462', text: '答案是什么？' })).status, 409);
+  await capture(example);
+  assert.equal((await api('/api/chat', { key: '13061309-e24956', text: '这一步是什么意思？' })).status, 409, 'not for an example');
+  assert.equal((await api('/api/state')).body.record.chat, undefined);
+});
+
 test('the list of prerequisites is offered over HTTP only before a question is answered', async t => {
   const { capture, api } = await harness(t);
   await capture(question(false));
@@ -135,8 +179,13 @@ test('the list of prerequisites is offered over HTTP only before a question is a
   await settle();
   const list = (await api('/api/state')).body.record.prereq;
   assert.equal(list.status, 'ready'); assert.equal(list.items[0].name, '概率'); assert.equal(list.views, 1);
+  const opened = await api('/api/prereq/expand', { key: '13061309-q360462', item: list.items[0].id });
+  assert.equal(opened.status, 200); assert.equal(opened.body.record.prereq.items[0].more.status, 'running');
+  await settle();
+  assert.equal((await api('/api/state')).body.record.prereq.items[0].more.example, '抛硬币，正面的概率是 1/2。');
   await capture(question(true));
   assert.equal((await api('/api/prereq', { key: '13061309-q360462' })).status, 409, 'once the answer is in');
+  assert.equal((await api('/api/prereq/expand', { key: '13061309-q360462', item: list.items[0].id })).status, 409, 'nor an item of it');
   await capture(example);
   assert.equal((await api('/api/prereq', { key: '13061309-e24956' })).status, 409, 'not for an example');
 });

@@ -134,3 +134,25 @@ test('a backslash JSON turned into a control character is put back, inside math 
   assert.equal(mend('花了 $5\n再花 $7\n'), '花了 $5\n再花 $7\n', 'money is not math');
   assert.equal(mend('plain'), 'plain'); assert.equal(mend(42), 42); assert.equal(mend(''), '');
 });
+
+test('an arrow with its label, as between two matrices in a row operation', () => {
+  assert.match(ok('A \\xrightarrow{R_2-2R_1} B'), /<mover><mo>→<\/mo><mrow>.*<\/mrow><\/mover>/);
+  assert.match(ok('A \\xrightarrow[k]{R_2} B'), /<munderover><mo>→<\/mo><mi>k<\/mi>/);
+  assert.match(ok('A\\xleftarrow{f}B'), /<mo>←<\/mo>/);
+  assert.match(ok('A \\xrightarrow B'), /<mover><mo>→<\/mo><mi>B<\/mi><\/mover>/, 'a single character is a whole argument, as in TeX');
+  assert.equal(texToMathML('A \\xrightarrow'), null, 'the label is missing');
+  assert.equal(texToMathML('A \\xrightarrow{R_2'), null, 'the label is not closed');
+  assert.match(ok('a\\longrightarrow b\\Longrightarrow c'), /⟶.*⟹/);
+});
+
+test('LaTeX written without dollar signs is still drawn, as one formula when it runs on, and nothing else is disturbed', () => {
+  const kinds = text => splitMath(text).map(p => p.t === 'math' ? `[${p.tex}]` : p.v).join('|');
+  const chain = '\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix} \\xrightarrow{R_2-2R_1} \\begin{bmatrix}1&2\\\\0&0\\end{bmatrix}';
+  assert.equal(kinds(`初等行变换： ${chain} 第二行是 $0=2$。`), `初等行变换： |[${chain}]| 第二行是 |[0=2]|。`);
+  assert.equal(kinds('分数 \\frac{1}{2} 和 \\frac{3}{4} 相加'), '分数 |[\\frac{1}{2}]| 和 |[\\frac{3}{4}]| 相加', 'two with words between are two formulas');
+  assert.equal(kinds('文件在 C:\\Users\\me 下'), '文件在 C:\\Users\\me 下', 'a backslash that is not TeX stays');
+  assert.equal(kinds('命令 \\frac 需要两个参数'), '命令 \\frac 需要两个参数', 'what cannot be drawn stays as written');
+  assert.equal(kinds('价格 \\$5，公式 $x$'), '价格 $5，公式 |[x]', 'money and dollar-signed math as before');
+  assert.equal(kinds('$\\frac{1}{2}$'), '[\\frac{1}{2}]', 'inside dollars nothing is taken twice');
+  assert.equal(kinds('没有公式的一句话'), '没有公式的一句话');
+});

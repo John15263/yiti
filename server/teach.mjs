@@ -1,7 +1,7 @@
 import { changeRows, check, fields, text } from './validation.mjs';
 import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
 import { paraText, parasText } from './capture.mjs';
-import { progress } from './board.mjs';
+import { progress, pushChat } from './board.mjs';
 import { plan, apply } from './translate.mjs';
 import { learnable, learnParas, blockParas } from '../web/mode.js';
 import { mend } from '../web/tex.js';
@@ -26,8 +26,8 @@ export const SCHEMAS = {
   translate: { type: 'object', additionalProperties: false, required: ['title', 'paragraphs', 'phrases'], properties: { title: str,
     paragraphs: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'text'], properties: { id: str, text: str } } },
     phrases: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['en', 'zh'], properties: { en: str, zh: str } } } } },
-  say: { type: 'object', additionalProperties: false, required: ['score', 'math', 'note', 'suggestion', 'changes'],
-    properties: { score: { type: 'integer', minimum: 0, maximum: 100 }, math: { type: 'string', enum: ['right', 'partly', 'wrong'] }, note: str, suggestion: str,
+  say: { type: 'object', additionalProperties: false, required: ['intent', 'score', 'math', 'note', 'suggestion', 'changes'],
+    properties: { intent: { type: 'string', enum: ['key_step', 'question'] }, score: { type: 'integer', minimum: 0, maximum: 100 }, math: { type: 'string', enum: ['right', 'partly', 'wrong'] }, note: str, suggestion: str,
       changes: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['from', 'to', 'why'], properties: { from: str, to: str, why: str } } } } },
 };
 // Text a model wrote may have math in it ($…$); mend puts back the backslashes JSON turned into control characters.
@@ -182,14 +182,23 @@ export class Teach {
     rec.say.attempts.push(attempt);
     this.board.save(rec);
     const packet = sayPacket(rec, attempt.text);
-    const settle = (latest, change) => { const a = latest.say.attempts.find(x => x.id === attempt.id); if (a) Object.assign(a, change); };
+    const settle = (latest, change) => { const a = latest.say.attempts.find(x => x.id === attempt.id); if (a) Object.assign(a, change); return a; };
     this.background(async () => {
       const { value, model } = await this.call('say', packet, rec.key);
-      check(Number.isInteger(value.score) && value.score >= 0 && value.score <= 100 && typeof value.note === 'string', 'Invalid model response');
+      // What was written may be a question, not the key step (a reply without the field is a key step, as before).
+      const intent = value.intent === 'question' ? 'question' : 'key_step';
+      check(typeof value.note === 'string' && (intent === 'question' ? value.note.trim()
+        : Number.isInteger(value.score) && value.score >= 0 && value.score <= 100), 'Invalid model response');
       const latest = this.board.record(rec.key);
       if (!latest) return;
-      settle(latest, { status: 'done', score: value.score, math: ['right', 'partly', 'wrong'].includes(value.math) ? value.math : 'partly',
-        note: cut(value.note, 3000), suggestion: cut(value.suggestion, 1000), changes: changeRows(value.changes), model });
+      const note = cut(value.note, 3000);
+      // A question is not scored and is not the key step: its answer goes into the conversation about this question.
+      const done = intent === 'question' ? { intent, score: 0, math: 'partly', note, suggestion: '', changes: [] }
+        : { intent, score: value.score, math: ['right', 'partly', 'wrong'].includes(value.math) ? value.math : 'partly',
+          note, suggestion: cut(value.suggestion, 1000), changes: changeRows(value.changes) };
+      if (settle(latest, { status: 'done', ...done, model }) && intent === 'question') {
+        pushChat(latest, { role: 'user', text: attempt.text, from: 'say' }, { role: 'assistant', text: note, from: 'say', model });
+      }
       this.board.save(latest);
     }, rec.key, (latest, message) => settle(latest, { status: 'error', error: message }));
     return rec;
