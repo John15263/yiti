@@ -4,6 +4,7 @@ import { paraText, parasText } from './capture.mjs';
 import { progress } from './board.mjs';
 import { plan, apply } from './translate.mjs';
 import { learnable, learnParas, blockParas } from '../web/mode.js';
+import { mend } from '../web/tex.js';
 
 const now = () => new Date().toISOString();
 // The prompt texts, handed in by whoever runs this: read from prompts/ by the local server, bundled by the extension.
@@ -29,7 +30,8 @@ export const SCHEMAS = {
     properties: { score: { type: 'integer', minimum: 0, maximum: 100 }, math: { type: 'string', enum: ['right', 'partly', 'wrong'] }, note: str, suggestion: str,
       changes: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['from', 'to', 'why'], properties: { from: str, to: str, why: str } } } } },
 };
-const cut = (v, n) => typeof v === 'string' ? v.trim().slice(0, n) : '';
+// Text a model wrote may have math in it ($…$); mend puts back the backslashes JSON turned into control characters.
+export const cut = (v, n) => typeof v === 'string' ? mend(v.trim()).slice(0, n) : '';
 
 // Blocks always cover every paragraph once and in order, whatever the starts the model gave: each block
 // runs from its start to the next one's. Starts out of range or out of order are dropped.

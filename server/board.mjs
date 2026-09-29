@@ -12,6 +12,12 @@ function fresh(c, key, hash, at) {
     hash_version: HASH_VERSION, created_at: at, updated_at: at, prep: { status: 'none' }, translation: { status: 'none' }, progress: progress(0), say: { attempts: [] }, voice: [] };
 }
 
+// What a lesson teaches, from the tutorials and examples already followed on it: new material is not a prerequisite.
+// With `summaries`, a step that has been split into blocks also says in a sentence what it covered.
+export const lessonTitles = (store, rec, summaries = false) => store.steps()
+  .filter(r => r.task === rec.task && ['tutorial', 'example'].includes(r.step.type) && r.title).sort((a, b) => a.step.index - b.step.index)
+  .map(r => summaries && r.prep?.status === 'ready' && r.prep.summary ? `${r.title}：${r.prep.summary}` : r.title);
+
 // Follows whichever Math Academy step was read last, and keeps what was done on each step.
 export class Board {
   constructor(store, publish = () => {}) {

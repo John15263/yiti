@@ -2,6 +2,7 @@ import { check, fields, id, oneOf, text } from './validation.mjs';
 import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
 import { parasText } from './capture.mjs';
 import { prompt } from './teach.mjs';
+import { mend } from '../web/tex.js';
 
 // 换个样子: once a practice question is answered on Math Academy and its key step has been said in one sentence
 // and reviewed, the same key step comes back in a question with another setting and other numbers, to be
@@ -17,7 +18,7 @@ export const VARIANT_SCHEMAS = {
     properties: { verdict: { type: 'string', enum: ['right', 'slip', 'wrong'] }, note: str, fixed: str } },
 };
 const LESSON_ROUND = 4;
-const cut = (v, n) => typeof v === 'string' ? v.trim().slice(0, n) : '';
+const cut = (v, n) => typeof v === 'string' ? mend(v.trim()).slice(0, n) : '';
 const plain = v => String(v || '').normalize('NFKC').toLowerCase().replace(/\s+/g, '').replace(/[.。]$/u, '');
 export const reviewName = task => `review:${task}`;
 

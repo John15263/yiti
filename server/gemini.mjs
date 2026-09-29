@@ -1,4 +1,4 @@
-import { check } from './validation.mjs';
+import { check, parseReply } from './validation.mjs';
 
 // Only server-owned prompts and schemas reach this transport.
 export async function geminiJSON(packet, cfg, { instructions, schema, tokens = 4096, limit = 12000, purpose = null, key = null, timeout = cfg.geminiTimeout, model = cfg.geminiModel }, request = fetch) {
@@ -24,7 +24,7 @@ export async function geminiJSON(packet, cfg, { instructions, schema, tokens = 4
   check(candidate?.finishReason === 'STOP', 'Invalid Gemini response');
   const raw = candidate.content?.parts?.filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('');
   check(raw && raw.length <= limit, 'Invalid Gemini response');
-  return { value: JSON.parse(raw), model: typeof data.modelVersion === 'string' ? data.modelVersion.slice(0, 100) : model };
+  return { value: parseReply(raw), model: typeof data.modelVersion === 'string' ? data.modelVersion.slice(0, 100) : model };
 }
 
 export function geminiError(error) {

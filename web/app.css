@@ -31,6 +31,25 @@ h1{font-weight:450;font-size:19px;line-height:1.7;margin:24px 0 12px}
 .mathtext p,.original p{font-size:16px;line-height:1.85;margin:0 0 8px}
 .mathtext p.display,.original p.display{text-align:center;margin:10px 0 14px;overflow-x:auto;overflow-y:hidden;padding:2px 0}
 math{font-size:1.1em}math[display=block]{margin:0 auto}
+/* The browser does not stretch a bracket to a matrix's height, so math.js marks the table and the fence is drawn here:
+   a line down each side, with a short hook at each end for square brackets. */
+mtable[data-fence]{padding:.15em .55em;margin:0 .1em}
+mtable[data-fence=bracket]{background:
+  linear-gradient(currentColor,currentColor) left top/.32em 1.5px no-repeat,linear-gradient(currentColor,currentColor) left bottom/.32em 1.5px no-repeat,
+  linear-gradient(currentColor,currentColor) right top/.32em 1.5px no-repeat,linear-gradient(currentColor,currentColor) right bottom/.32em 1.5px no-repeat,
+  linear-gradient(currentColor,currentColor) left center/1.5px 100% no-repeat,linear-gradient(currentColor,currentColor) right center/1.5px 100% no-repeat}
+mtable[data-fence=paren],mtable[data-fence=brace]{border-inline:1.5px solid currentColor;border-radius:.9em/50%}
+mtable[data-fence=bar]{border-inline:1.5px solid currentColor}
+mtable[data-fence=dbar]{border-inline:4px double currentColor}
+mtable[data-fence=cases]{border-inline-start:1.5px solid currentColor;border-radius:.9em 0 0 .9em/50% 0 0 50%;padding-inline-end:.2em}
+#prereq{margin:6px 0 4px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fbfcfb}
+#prereq .verdict-line{margin:0 0 4px}#prereq h4{margin:12px 0 2px;font-size:13px;font-weight:500;color:var(--muted)}
+.prereq-items{list-style:none;margin:0;padding:0}.prereq-items li{font-size:15px;line-height:1.85;padding:2px 0}
+.prereq-items b{font-weight:500;margin-right:10px}.prereq-items span{color:var(--muted);font-size:14px}
+mtable[data-align=left] mtd{text-align:left}
+mtable[data-align=right] mtd{text-align:right}
+mtable[data-align=alt] mtd:nth-child(odd){text-align:right}
+mtable[data-align=alt] mtd:nth-child(even){text-align:left}
 code.tex{white-space:pre-wrap}
 #context p{font-size:17px}
 .choices{list-style:none;padding:0;margin:6px 0 4px;display:flex;flex-wrap:wrap;gap:8px}

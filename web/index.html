@@ -59,7 +59,14 @@
         <p id="done" class="meaning" hidden></p>
       </div>
 
-      <p id="ask" class="meaning" hidden>先在 Math Academy 做完、交答案，答错也没关系。<span class="muted">卡在基础上，按 ⌘ ] 问前置知识。</span></p>
+      <p id="ask" class="meaning" hidden>先在 Math Academy 做完、交答案，答错也没关系。<span class="muted">卡在基础上，点下面的「前置知识」看清单，或按 ⌘ ] 问语音。</span></p>
+
+      <div id="prereq" hidden>
+        <p class="verdict-line"><b>做这道题要用到的前置知识</b></p>
+        <p id="prereq-status" class="muted"></p>
+        <div id="prereq-list"></div>
+        <p class="muted">这是模型整理的参考，不是 Math Academy 的官方清单。只列更基础的知识，不涉及这道题怎么做，也不含这节课新教的内容。</p>
+      </div>
 
       <div id="say" hidden>
         <p class="verdict-line"><b id="say-result"></b><button id="say-explain" class="link"></button><span id="say-prior" class="muted"></span></p>

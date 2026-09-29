@@ -32,15 +32,16 @@ function fakeInfer(calls) {
       { start: 2, meaning: 'duplicate start is dropped', focus: '', answer: '', terms: [], hints: [] },
       { start: 4, meaning: '结论', focus: '写出结果', answer: '48', terms: [], hints: [] }] } };
     if (opts.purpose === 'check') return { model: 'fake', value: { verdict: packet.written.includes('P') ? 'pass' : 'adjust', note: 'ok', fixed: 'n * P' } };
+    if (opts.purpose === 'prereq') return { model: 'fake', value: { items: [{ kind: 'concept', name: '概率', note: '事件发生的可能性有多大。' }] } };
     if (opts.purpose === 'say') return { model: 'fake', value: { score: 88, math: 'right', note: '成立', suggestion: 'Multiply 50 by 3/5.', changes: [{ from: 'multiple', to: 'multiply', why: '动词' }] } };
     throw new Error('unexpected');
   };
 }
 const settle = () => new Promise(r => setTimeout(r, 20));
 
-async function harness(t) {
+async function harness(t, infer) {
   const calls = [];
-  const app = createServer({ store: new Store(':memory:'), cfg: { geminiKey: 'test', geminiModel: 'fake', voiceMaxSeconds: 60, voiceIdleSeconds: 30 }, webRoot: new URL('../web', import.meta.url).pathname, token: 't'.repeat(64), infer: fakeInfer(calls) });
+  const app = createServer({ store: new Store(':memory:'), cfg: { geminiKey: 'test', geminiModel: 'fake', voiceMaxSeconds: 60, voiceIdleSeconds: 30 }, webRoot: new URL('../web', import.meta.url).pathname, token: 't'.repeat(64), infer: infer || fakeInfer(calls) });
   await new Promise(r => app.server.listen(0, '127.0.0.1', r));
   t.after(() => { app.closeStreams(); app.server.close(); });
   const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -125,6 +126,21 @@ test('a question gets nothing until it is answered, then one sentence is reviewe
   assert.equal(rec.say.attempts[0].changes[0].to, 'multiply');
 });
 
+test('the list of prerequisites is offered over HTTP only before a question is answered', async t => {
+  const { capture, api } = await harness(t);
+  await capture(question(false));
+  const asked = await api('/api/prereq', { key: '13061309-q360462' });
+  assert.equal(asked.status, 200);
+  assert.equal(asked.body.record.prereq.status, 'running');
+  await settle();
+  const list = (await api('/api/state')).body.record.prereq;
+  assert.equal(list.status, 'ready'); assert.equal(list.items[0].name, '概率'); assert.equal(list.views, 1);
+  await capture(question(true));
+  assert.equal((await api('/api/prereq', { key: '13061309-q360462' })).status, 409, 'once the answer is in');
+  await capture(example);
+  assert.equal((await api('/api/prereq', { key: '13061309-e24956' })).status, 409, 'not for an example');
+});
+
 test('only the step being followed can be changed', async t => {
   const { capture, api } = await harness(t);
   await capture(example);
@@ -195,6 +211,27 @@ test('every page script is served by the local server', async t => {
     assert.match(res.headers.get('content-type'), /javascript/);
     await res.arrayBuffer();
   }
+});
+
+test('TeX a model wrote with its backslashes eaten by JSON is put back in blocks and reviews', async t => {
+  // What arrives when a model writes \begin, \frac, \neq and \theta with one backslash each and the reply parses.
+  const eaten = tex => tex.replace(/\\begin/g, '\begin').replace(/\\frac/g, '\frac').replace(/\\neq/g, '\neq').replace(/\\theta/g, '\theta');
+  const infer = async (packet, opts) => {
+    if (opts.purpose === 'prepare') return { model: 'fake', value: { summary: 's', blocks: [{ start: 0, meaning: eaten('见 $\\frac{1}{2}$'), focus: 'f',
+      answer: 'a', terms: [], hints: [eaten('$\\begin{bmatrix}1&2\\end{bmatrix}$'), eaten('当 $a\\neq b$，角 $\\theta$'), 'h3'] }] } };
+    if (opts.purpose === 'say') return { model: 'fake', value: { score: 90, math: 'right', note: eaten('$\\frac{a}{b}$ 不能为 $b=0$'), suggestion: eaten('取 $\\theta$'), changes: [] } };
+    throw new Error('unexpected');
+  };
+  const { capture, api } = await harness(t, infer);
+  await capture(example);
+  await api('/api/prepare', { key: '13061309-e24956' }); await settle();
+  const block = (await api('/api/state')).body.record.prep.blocks[0];
+  assert.equal(block.meaning, '见 $\\frac{1}{2}$');
+  assert.deepEqual(block.hints, ['$\\begin{bmatrix}1&2\\end{bmatrix}$', '当 $a\\neq b$，角 $\\theta$', 'h3']);
+  await capture(question(true));
+  await api('/api/say', { key: '13061309-q360462', text: 'Take theta.' }); await settle();
+  const said = (await api('/api/state')).body.record.say.attempts[0];
+  assert.equal(said.note, '$\\frac{a}{b}$ 不能为 $b=0$'); assert.equal(said.suggestion, '取 $\\theta$');
 });
 
 test('the built-in example can be tried without Math Academy', async t => {

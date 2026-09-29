@@ -23,6 +23,16 @@ export function changeRows(value) {
   return value.filter(c => c && typeof c.from === 'string' && typeof c.to === 'string' && typeof c.why === 'string' && c.to.trim())
     .slice(0, 8).map(c => ({ from: c.from.slice(0, 300), to: c.to.slice(0, 300), why: c.why.slice(0, 200) }));
 }
+// A model's reply as JSON. One that writes TeX may leave a backslash single, and JSON refuses most letters after it
+// (\cdot, \sqrt, \alpha): those are doubled and the reply read again. Valid JSON is never touched.
+export function parseReply(raw) {
+  try { return JSON.parse(raw); }
+  catch (error) {
+    const fixed = raw.replace(/\\(["\\/bfnrt]|u[0-9a-fA-F]{4})|\\/g, (all, valid) => valid ? all : '\\\\');
+    if (fixed === raw) throw error;
+    return JSON.parse(fixed);
+  }
+}
 export function oneOf(value, options) { check(options.includes(value), 'Invalid option'); return value; }
 export function revision(value, current) {
   check(Number.isInteger(value) && value >= 0, 'Invalid expected_revision');

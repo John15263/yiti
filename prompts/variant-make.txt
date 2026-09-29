@@ -14,12 +14,17 @@ items 里每一项是一道原题：原题、选项（可能没有）、官方�
 
 ## 字段
 
-- question_en：用 Math Academy 那样简单、规范的英文写题目。
-- question_zh：同一道题的中文。
-- answer：最终答案，纯文本。
-- solution：中文分步解法，三到六行，每行一步，第一步就点出关键一步用在哪里。
-- hint：一句中文，说在这道新题里关键一步落在哪里（例如"先求出不是蓝色的概率"），不给算出来的数。
+- question_en：（可用 LaTeX）用 Math Academy 那样简单、规范的英文写题目。
+- question_zh：（可用 LaTeX）同一道题的中文。
+- answer：最终答案，**纯文本**，不用 LaTeX（学习者在文本框里打纯文本，要拿它来对答案）：3/5、x^2、sqrt(2)；矩阵写成 [[19,22],[43,50]]。
+- solution：（可用 LaTeX）中文分步解法，三到六行，每行一步，第一步就点出关键一步用在哪里。
+- hint：（可用 LaTeX）一句中文，说在这道新题里关键一步落在哪里（例如"先求出不是蓝色的概率"），不给算出来的数。
 
-数学一律用纯文本写：3/5、x^2、sqrt(2)、P(A or B)，不用 LaTeX，不用 $ 符号。
+## 数学的写法
+
+给学习者**看**的文字里（下面标了"可用 LaTeX"的字段），有结构的数学——矩阵、分式、根号、上下标、求和、分段函数——用 LaTeX 写在美元符号里：夹在文字中间用 $…$，单独占一行用 $$…$$。简单的式子和数字直接写，不用套美元符号。
+- 整个回复是 JSON，所以 LaTeX 里的每个反斜杠都要写成两个。例如字段值 "结构：$\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}$，每项是 $\\frac{1}{2}$" 显示出来是一个 2×2 矩阵和一个分式。
+- 只用常见的命令：\frac \sqrt \cdot \times \pm \le \ge \ne \approx \sum \int \lim，希腊字母（\pi \theta \lambda …），\mathbf{v}、\vec{v}、A^{-1}、A^\top，环境只用 pmatrix、bmatrix、vmatrix、cases、aligned。不要定义新命令。
+- 文字里表示钱的美元符号写成 \\$（它不是公式）。
 
 只返回符合 schema 的 JSON：items 与输入一一对应、顺序相同。

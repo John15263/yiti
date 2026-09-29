@@ -1,4 +1,4 @@
-import { check } from './validation.mjs';
+import { check, parseReply } from './validation.mjs';
 import { geminiJSON, geminiError } from './gemini.mjs';
 
 // Every text call (preparing, translating, checking, reviewing) goes through here; TEXT_PROVIDER picks who
@@ -47,7 +47,7 @@ async function chatJSON(packet, cfg, { instructions, schema, tokens = 4096, limi
   check(choice?.finish_reason === 'stop', `Invalid ${name} response`);
   const raw = choice.message?.content;
   check(typeof raw === 'string' && raw && raw.length <= limit, `Invalid ${name} response`);
-  return { value: JSON.parse(raw), model: typeof data.model === 'string' ? data.model.slice(0, 100) : model };
+  return { value: parseReply(raw), model: typeof data.model === 'string' ? data.model.slice(0, 100) : model };
 }
 
 // DeepSeek refuses "json_schema" (tried 2026-09-25). It thinks first by default, which judging maths wants

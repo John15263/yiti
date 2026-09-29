@@ -1,4 +1,4 @@
-import { draw } from './math.js';
+import { draw, rich } from './math.js';
 import { learnable, learnParas } from './mode.js';
 import { createVoice } from './voice.js';
 import { createSettings } from './settings.js';
@@ -8,7 +8,7 @@ import { newestOnly } from './order.js';
 const $ = id => document.getElementById(id);
 const KIND = { tutorial: '讲解', example: '例题', question: '练习题' };
 const PAGES = { quiz: '测验', review: '复习', multistep: '多步题', diagnostic: '诊断', assessment: '测评' };
-let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnSay = '', drawnExplain = '', drawnVariant = '', explainOpen = false;
+let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnBlock = '', drawnLook = '', drawnSay = '', drawnExplain = '', drawnVariant = '', explainOpen = false, prereqOpen = '';
 const asked = new Set();
 const record = () => state?.record || null;
 
@@ -83,7 +83,7 @@ function render(next) {
   const title = rec.step.type === 'question' ? '' : shown(rec).title;
   $('step-title').textContent = title; $('step-title').hidden = !title;
   renderContext(rec);
-  for (const id of ['blocks', 'ask', 'say', 'variant']) $(id).hidden = true;
+  for (const id of ['blocks', 'ask', 'prereq', 'say', 'variant']) $(id).hidden = true;
   const actions = learnable(rec) ? renderLearnable(rec, next.gemini, notes) : rec.step.type === 'question' ? renderQuestion(rec) : {};
   const variantActions = renderVariants(rec, next, actions);
   // Waiting and errors for the whole step share one quiet line; an error can be clicked to try again.
@@ -154,7 +154,7 @@ function renderLearnable(rec, gemini, notes) {
     if (sig !== drawnBlock || drawnLook !== look(rec)) {
       drawnLook = look(rec);
       draw($('learn-original'), shownBlock(rec, block));
-      $('learn-meaning').textContent = block.meaning;
+      rich($('learn-meaning'), block.meaning);
       $('learn-terms').replaceChildren(...block.terms.map(t => {
         const li = document.createElement('li'), b = document.createElement('b');
         b.textContent = t.en; li.append(b, t.zh); return li;
@@ -167,22 +167,22 @@ function renderLearnable(rec, gemini, notes) {
   }
   // Writing, and seeing the check: the same box stays, so the text written is never lost.
   $('write').hidden = false;
-  $('write-focus').textContent = block.focus;
+  rich($('write-focus'), block.focus);
   const box = $('write-text');
   if (!drawnBlock.startsWith(`${rec.key}:${i}:`) || drawnBlock.endsWith(':learn')) {
     box.value = drafts.get(writeDraftKey(rec)) || input.attempts.at(-1)?.text || '';
     requestAnimationFrame(() => box.focus());
   }
   drawnBlock = sig;
-  $('hints').replaceChildren(...block.hints.slice(0, input.hints).map(h => { const li = document.createElement('li'); li.textContent = h; return li; }));
+  $('hints').replaceChildren(...block.hints.slice(0, input.hints).map(h => { const li = document.createElement('li'); rich(li, h); return li; }));
   const last = input.attempts.at(-1), running = last?.status === 'running', done = input.attempts.findLast(a => a.status === 'done');
   $('checked').hidden = p.phase !== 'checked' || !done;
   if (p.phase === 'checked' && done) {
     $('checked-verdict').textContent = done.verdict === 'pass' ? '✓ 对了' : '还差一点';
     $('checked-verdict').className = done.verdict;
-    $('checked-note').textContent = done.note;
+    rich($('checked-note'), done.note);
     $('checked-fixed').hidden = !done.fixed || done.fixed === done.text;
-    $('checked-fixed').textContent = done.fixed;
+    rich($('checked-fixed'), done.fixed);
     draw($('checked-original'), shownBlock(rec, block));
   }
   const links = [];
@@ -201,9 +201,33 @@ function writeLabel(rec) {
   return rec.progress.index + 1 < rec.prep.blocks.length ? '下一块  ⌘↵' : '完成  ⌘↵';
 }
 
+// 前置知识: what a question not yet answered rests on, in three kinds; the model's own reference, never this question's working.
+const PREREQ_KINDS = { concept: '基础概念', method: '基础方法', formula: '基础公式' };
+function drawPrereq(p) {
+  const ready = p?.status === 'ready';
+  $('prereq-status').hidden = ready;
+  $('prereq-status').textContent = !p || p.status === 'running' ? '正在整理前置知识…' : p.error || '';
+  $('prereq-list').replaceChildren(...(ready ? Object.entries(PREREQ_KINDS).flatMap(([kind, title]) => {
+    const items = p.items.filter(i => i.kind === kind);
+    if (!items.length) return [];
+    const heading = document.createElement('h4'), list = document.createElement('ul');
+    heading.textContent = title; list.className = 'prereq-items';
+    list.append(...items.map(i => { const li = document.createElement('li'), name = document.createElement('b'), note = document.createElement('span'); rich(name, i.name); rich(note, i.note); li.append(name, note); return li; }));
+    return [heading, list];
+  }) : []));
+}
 function renderQuestion(rec) {
   const s = rec.sections;
-  if (!s.result) { $('ask').hidden = false; return {}; }
+  if (!s.result) {
+    $('ask').hidden = false;
+    // The list of more basic knowledge, only until the answer is in.
+    const p = rec.prereq, open = prereqOpen === rec.key;
+    $('prereq').hidden = !open;
+    if (open) drawPrereq(p);
+    const toggle = () => { prereqOpen = open ? '' : rec.key; render(state); if (!open) void post('/api/prereq', { key: rec.key }); };
+    return { links: [{ label: open ? '收起前置知识' : '前置知识', run: toggle },
+      ...(open && p?.status === 'error' ? [{ label: '重新整理', run: () => void post('/api/prereq', { key: rec.key }) }] : [])] };
+  }
   $('say').hidden = false;
   const correct = /^correct/i.test(s.result);
   $('say-result').textContent = lang === 'zh' ? (correct ? '✓ 答对了' : '✗ 答错了') : `${correct ? '✓ ' : '✗ '}${s.result}`;
@@ -212,7 +236,7 @@ function renderQuestion(rec) {
   $('say-explanation').hidden = !explainOpen;
   if (explainOpen && drawnExplain !== `${rec.key}:${rec.hash}:${look(rec)}`) { draw($('say-explanation'), shown(rec).sections.explanation); drawnExplain = `${rec.key}:${rec.hash}:${look(rec)}`; }
   // Help asked for before answering is part of what the answer was.
-  const prior = rec.voice.filter(v => v.mode === 'prereq').length;
+  const prior = rec.voice.filter(v => v.mode === 'prereq').length + (rec.prereq?.views || 0);
   $('say-prior').textContent = prior ? `交答案前问过前置知识 ${prior} 次` : '';
   if (drawnSay !== `${rec.key}:${rec.hash}`) {
     $('say-text').value = drafts.get(`${rec.key}:say`) || rec.say.attempts.at(-1)?.text || '';
@@ -223,8 +247,8 @@ function renderQuestion(rec) {
   if (done) {
     $('say-score').textContent = `${done.score} 分 · ${{ right: '抓住了关键', partly: '方向对，还不完整', wrong: '没抓住关键' }[done.math]}`;
     $('say-score').className = done.score >= 85 ? 'pass' : 'adjust';
-    $('say-note').textContent = done.note;
-    $('say-suggestion').textContent = done.suggestion;
+    rich($('say-note'), done.note);
+    rich($('say-suggestion'), done.suggestion);
     $('say-suggestion').hidden = !done.suggestion || done.suggestion === done.text;
     $('say-changes').replaceChildren(...done.changes.map(c => {
       const li = document.createElement('li'), del = document.createElement('del'), ins = document.createElement('ins'), why = document.createElement('span');
@@ -272,24 +296,24 @@ function showVariant(rec, set, round, own) {
   if (set.status === 'error') return { links: [{ label: '重新出题', run: () => void post(round === 1 ? '/api/variant' : '/api/variant/lesson', { key: rec.key }) }, ...resay], status: set.error };
   const item = set.items[set.index], count = set.items.length, finished = !openRound(set);
   if (round === 2) $('variant-title').textContent = `${title} · ${set.index + 1} / ${count}`;
-  $('variant-question').hidden = false; $('variant-question').textContent = lang === 'zh' ? item.question_zh : item.question_en;
+  $('variant-question').hidden = false; rich($('variant-question'), lang === 'zh' ? item.question_zh : item.question_en);
   const box = $('variant-text'), sig = `${rec.key}:${round}:${item.id}`;
   box.hidden = false; box.disabled = item.status !== 'open';
   if (drawnVariant !== sig) { drawnVariant = sig; box.value = drafts.get(`${rec.key}:v:${item.id}`) || item.attempts.at(-1)?.text || ''; if (!box.disabled) requestAnimationFrame(() => box.focus()); }
   const levels = [`刚才那道题的关键一步：${item.key_step}`, item.hint, '解法在下面。'];
-  $('variant-hints').replaceChildren(...levels.slice(0, item.hints).map(h => Object.assign(document.createElement('li'), { textContent: h })));
+  $('variant-hints').replaceChildren(...levels.slice(0, item.hints).map(h => { const li = document.createElement('li'); rich(li, h); return li; }));
   const last = item.attempts.at(-1), running = last?.status === 'running', done = item.attempts.findLast(a => a.status === 'done');
   const solved = item.status !== 'open' || item.hints >= 3;
   if (done) {
     $('variant-checked').hidden = false;
     $('variant-verdict').textContent = VERDICT[done.verdict][0]; $('variant-verdict').className = VERDICT[done.verdict][1];
-    $('variant-note').textContent = done.note;
+    rich($('variant-note'), done.note);
     // A correction written out would give the answer away while it can still be tried again.
     $('variant-fixed').hidden = !done.fixed || done.fixed === done.text || !(done.verdict === 'right' || solved);
-    $('variant-fixed').textContent = done.fixed;
+    rich($('variant-fixed'), done.fixed);
   }
   $('variant-solution').hidden = !solved;
-  $('variant-solution').textContent = `解法\n${item.solution}\n答案：${item.answer}`;
+  rich($('variant-solution'), `解法\n${item.solution}\n答案：${item.answer}`);
   if (finished) {
     const right = set.items.filter(i => i.passed).length;
     return { links: resay, status: round === 1 ? '做完了。回 Math Academy 点 Continue。' : `本课回顾做完了：${count} 道里做对了 ${right} 道。` };
