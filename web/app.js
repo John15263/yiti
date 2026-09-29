@@ -3,6 +3,7 @@ import { learnable, learnParas } from './mode.js';
 import { createVoice } from './voice.js';
 import { createSettings } from './settings.js';
 import { request, subscribe } from './backend.js';
+import { newestOnly } from './order.js';
 
 const $ = id => document.getElementById(id);
 const KIND = { tutorial: '讲解', example: '例题', question: '练习题' };
@@ -31,9 +32,11 @@ const look = rec => `${lang}:${shown(rec).zh}`;
 function show(section) { for (const id of ['waiting', 'elsewhere', 'step']) $(id).hidden = id !== section; }
 function error(message) { $('error').textContent = message || ''; $('error').hidden = !message; }
 
+// A reply and a push can arrive in either order; only the newer state is drawn.
+const isNewest = newestOnly();
 async function post(path, body) {
   error('');
-  try { const data = await request(path, body); render(data); return data; }
+  try { const data = await request(path, body); if (isNewest(data)) render(data); return data; }
   catch (e) { error(e.message); return null; }
 }
 const command = (type, extra = {}) => post('/api/command', { type, key: record().key, index: record().progress.index, ...extra });
@@ -379,5 +382,5 @@ const settings = createSettings();
 $('settings-open').onclick = () => void settings.open();
 const voice = createVoice({ getRecord: record, draftOf: () => $('write-text').value, available: () => state?.voice !== false });
 
-subscribe(value => { $('connection').hidden = true; render(value); },
+subscribe(value => { $('connection').hidden = true; if (isNewest(value)) render(value); },
   () => { $('connection').textContent = '和一题断开了，正在重连…'; $('connection').hidden = false; });

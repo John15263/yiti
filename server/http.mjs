@@ -26,7 +26,7 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   const usage = new Usage(store); cfg = { ...cfg, usage };
   const files = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.css', ['app.css', 'text/css; charset=utf-8']],
-    ...['app.js', 'math.js', 'mode.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js', 'demo.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
+    ...['app.js', 'math.js', 'mode.js', 'order.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js', 'demo.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();

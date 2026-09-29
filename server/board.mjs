@@ -16,6 +16,9 @@ function fresh(c, key, hash, at) {
 export class Board {
   constructor(store, publish = () => {}) {
     this.store = store; this.publish = publish;
+    // Every state handed out is numbered in the order it was taken, so the page can tell an older one from a newer
+    // one (web/order.js). The count restarts with the engine, hence the boot id beside it.
+    this.boot = crypto.randomUUID(); this.seq = 0;
     // Calls cut off by a restart are never replayed (avoids surprise charges); they are marked so they can be retried.
     for (const rec of store.steps()) {
       let touched = false;
@@ -40,7 +43,7 @@ export class Board {
   state() {
     const current = this.current(), record = current?.key ? this.store.step(current.key) : null;
     // The lesson's 换个样子 round, once asked for on its last step.
-    return { current, record, review: record ? this.store.get(`review:${record.task}`) : null };
+    return { current, record, review: record ? this.store.get(`review:${record.task}`) : null, boot: this.boot, seq: ++this.seq };
   }
   // Only the step being followed can be changed, so a page left on an old step never writes over it.
   active(key) {

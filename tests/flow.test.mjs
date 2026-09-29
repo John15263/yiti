@@ -50,7 +50,7 @@ async function harness(t) {
     const res = await fetch(`${base}${path}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${'t'.repeat(64)}`, 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
     return { status: res.status, body: await res.json() };
   };
-  return { app, calls, capture, api };
+  return { app, calls, capture, api, base };
 }
 
 test('captures are accepted only from the extension or Math Academy itself', async t => {
@@ -150,6 +150,51 @@ test('records fingerprinted with the old hash keep their preparation and transla
   assert.equal(rec.prep.hash, rec.hash);
   assert.equal(rec.prep.status, 'ready');
   assert.equal(rec.translation.hash, textFingerprint(sections));
+});
+
+test('a reply is numbered lower than the push that follows it, however fast the model answers', async t => {
+  const { capture, api, base } = await harness(t);
+  await capture(example);
+  const events = new AbortController();
+  try {
+    const stream = await fetch(`${base}/api/events`, { headers: { Authorization: `Bearer ${'t'.repeat(64)}` }, signal: events.signal });
+    const reader = stream.body.getReader(), decoder = new TextDecoder();
+    let buffer = '';
+    // The next state pushed over the event stream.
+    const pushed = async () => {
+      for (;;) {
+        const end = buffer.indexOf('\n\n');
+        if (end < 0) { const { value, done } = await reader.read(); assert.ok(!done, 'the event stream ended'); buffer += decoder.decode(value, { stream: true }); continue; }
+        const chunk = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+        const data = chunk.startsWith('event: state') && chunk.split('\n').find(line => line.startsWith('data: '));
+        if (data) return JSON.parse(data.slice(6));
+      }
+    };
+    const first = await pushed();
+    assert.equal(typeof first.boot, 'string');
+    // The fake model answers at once: the reply below is taken before the job runs and says "running";
+    // the push that says "ready" is taken after it, so it must carry the higher number.
+    const reply = await api('/api/prepare', { key: '13061309-e24956' });
+    assert.equal(reply.body.record.prep.status, 'running');
+    let last;
+    do { last = await pushed(); } while (last.record.prep.status !== 'ready');
+    assert.equal(reply.body.boot, first.boot);
+    assert.equal(last.boot, first.boot);
+    assert.ok(first.seq < reply.body.seq, 'a later state has the higher number');
+    assert.ok(reply.body.seq < last.seq, 'the old reply is numbered below the push that finished the work');
+    assert.ok((await api('/api/state')).body.seq > last.seq);
+  } finally { events.abort(); }
+});
+
+test('every page script is served by the local server', async t => {
+  const { base } = await harness(t);
+  const { readdirSync } = await import('node:fs');
+  for (const file of readdirSync(new URL('../web', import.meta.url)).filter(f => f.endsWith('.js'))) {
+    const res = await fetch(`${base}/${file}`);
+    assert.equal(res.status, 200, `${file} is missing from the files list in server/http.mjs`);
+    assert.match(res.headers.get('content-type'), /javascript/);
+    await res.arrayBuffer();
+  }
 });
 
 test('the built-in example can be tried without Math Academy', async t => {
