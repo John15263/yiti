@@ -302,3 +302,27 @@ test('an item opened before tellings were kept can still be told more simply, an
   const marked = status(slow.board).items[0].more.simplifying;
   assert.equal(marked.status, 'error'); assert.match(marked.error, /重启/);
 });
+
+// A cut never lands inside a formula.
+import { cutMath, cut } from '../server/teach.mjs';
+test('a long name or note is cut without leaving a formula open', () => {
+  const formula = '$\\cos\\left(\\frac{\\pi}{4}\\right)=\\sin\\left(\\frac{\\pi}{4}\\right)=\\frac{\\sqrt{2}}{2}$';
+  const name = `特殊角三角函数值：${formula}`;
+  assert.ok(name.length > 80);
+  assert.equal(cut(name, 80), name, 'the formula the limit falls in is kept whole when it ends soon after');
+  const far = `前缀${'字'.repeat(70)}$${'x+'.repeat(400)}1$`;
+  assert.equal(cut(far, 80), `前缀${'字'.repeat(70)}`, 'a formula that runs far past the limit is left out, not cut in half');
+  assert.equal(cutMath('abcdefghij', 4), 'abcd', 'plain text is cut where the limit is');
+  assert.equal(cutMath('short $x$', 80), 'short $x$');
+  assert.equal(cutMath('it costs $5 and then some more words after that', 12), 'it costs $5 ', 'a dollar sign with no closing one is only a dollar sign');
+  assert.equal(cutMath('a \\$ b $x$ c', 6), 'a \\$ b', 'an escaped dollar sign opens nothing');
+  assert.equal(cutMath('ab $$x^2$$ cd', 5), 'ab $$x^2$$', 'a display formula too');
+  assert.equal(cutMath('before $a$ and more text', 8), 'before $a$', 'a formula starting before the limit and ending after it');
+  assert.equal(cut(undefined, 5), ''); assert.equal(cut('  x  ', 5), 'x');
+});
+
+test('an item whose name is a long formula keeps all of it', () => {
+  const name = '特殊角三角函数值：$\\cos\\left(\\frac{\\pi}{4}\\right)=\\sin\\left(\\frac{\\pi}{4}\\right)=\\frac{\\sqrt{2}}{2}$';
+  const [item] = itemsOf([{ kind: 'formula', name, note: '45 度角的正弦和余弦值均为 $\\frac{\\sqrt{2}}{2}$。' }], question(false));
+  assert.equal(item.name, name); assert.match(item.note, /\$\\frac\{\\sqrt\{2\}\}\{2\}\$/);
+});

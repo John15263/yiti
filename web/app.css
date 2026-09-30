@@ -28,7 +28,7 @@ header{flex:none;display:flex;align-items:center;gap:10px;padding:0 28px;height:
 /* 这一步在 #stage 里自己滚动；问一问（#dock）不跟着滚。窄的时候在下面，宽的时候在右边。 */
 #app{flex:1;min-height:0;display:flex;flex-direction:column}
 #stage{flex:1;min-height:0;overflow-y:auto}
-main{width:min(760px,100%);margin:auto;padding:6px 28px 40px}
+main{width:min(760px,100%);margin:auto;padding:6px 28px 80px}
 h1{font-weight:450;font-size:calc(19px*var(--fs));line-height:1.7;margin:24px 0 12px}
 
 /* 一步 */
@@ -114,18 +114,21 @@ textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px #cddbe5}
 .chat-msg.tutor{padding:8px 12px;background:var(--soft);border-radius:8px;color:var(--ink)}
 .chat-msg.spoken{border-left:2px solid #cfd6dc;padding-left:10px}.chat-msg.spoken.tutor{border-radius:0 8px 8px 0}
 .chat-call{color:var(--muted);font-size:calc(12px*var(--fs));margin:12px 0 4px}
-@media (max-width:979px){
-  #dock.folded{height:auto}
-  #dock.folded>:not(.dock-head){display:none}
-  #dock.folded .dock-head{padding-top:8px;padding-bottom:8px}
-}
 @media (min-width:980px){
   #app{flex-direction:row}
   #dock{width:var(--dock-w,400px);height:auto;border-top:0;border-left:1px solid var(--line)}
   #dock-grip{position:absolute;left:-6px;top:0;bottom:0;width:12px;height:auto;cursor:ew-resize;z-index:1}
   #dock-grip::after{width:4px;height:38px}
-  .dock-head{padding-top:14px}#dock-fold{display:none}
+  .dock-head{padding-top:14px}
 }
+/* 收起时角落里的一小粒：问一问，和语音；有新回复时问一问上有一个点 */
+#pill{position:fixed;right:14px;bottom:14px;z-index:4;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.pill-row{display:flex;gap:6px;padding:4px;background:#fdfdfbee;border:1px solid var(--line);border-radius:999px;box-shadow:0 4px 16px rgba(30,45,40,.16)}
+.pill-row button{min-height:0;padding:7px 16px;font-size:calc(13px*var(--fs));position:relative}
+#pill-voice{border-color:var(--line);color:var(--muted)}#pill-voice:hover{color:var(--ink)}
+#pill-voice.live{border-color:#b85c46;color:#b85c46}
+#pill-ask.fresh::after{content:"";position:absolute;top:2px;right:4px;width:8px;height:8px;border-radius:50%;background:#e2a04a;border:1.5px solid #fdfdfb}
+#pill-note{margin:0;max-width:min(320px,calc(100vw - 28px));padding:8px 12px;background:var(--ink);color:#fff;border-radius:10px;font-size:calc(12px*var(--fs));line-height:1.6;box-shadow:0 4px 16px rgba(30,45,40,.2)}
 /* 划线之后出现的一小排按钮 */
 #ask-pop{position:fixed;z-index:5;display:flex;gap:2px;padding:4px;background:var(--ink);border-radius:999px;box-shadow:0 6px 20px rgba(30,45,40,.25)}
 #ask-pop button{min-height:0;padding:5px 11px;border:0;border-radius:999px;background:transparent;color:#fff;font-size:calc(12px*var(--fs))}

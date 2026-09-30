@@ -156,3 +156,14 @@ test('LaTeX written without dollar signs is still drawn, as one formula when it 
   assert.equal(kinds('$\\frac{1}{2}$'), '[\\frac{1}{2}]', 'inside dollars nothing is taken twice');
   assert.equal(kinds('没有公式的一句话'), '没有公式的一句话');
 });
+
+test('a brace under a matrix, with its label beneath, as in "x times a column (a1) plus ..."', () => {
+  const out = texToMathML('x_1\\underbrace{\\begin{bmatrix} 1 \\\\ -2 \\end{bmatrix}}_{a_1} + x_2\\underbrace{\\begin{bmatrix} -1 \\\\ 3 \\end{bmatrix}}_{a_2}', true);
+  assert.ok(out, 'drawn, not shown as TeX');
+  assert.equal((out.match(/<mtable/g) || []).length, 2, 'both columns stay tables');
+  assert.equal((out.match(/<mo>⏟<\/mo>/g) || []).length, 2);
+  assert.match(out, /<munder><munder><mrow>|<munder><munder>/, 'the label goes under the brace, even inline');
+  assert.equal(texToMathML('\\underbrace{a+b}_{2}', false).includes('<munder><munder>'), true, 'also inline');
+  assert.match(texToMathML('\\overbrace{a+b}^{n}', false), /<mover><mover>.*⏞.*<\/mover>.*<mi>n<\/mi><\/mover>/);
+  assert.match(texToMathML('\\underbrace{a+b}', true), /⏟/, 'a brace with no label');
+});

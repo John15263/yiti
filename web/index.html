@@ -73,15 +73,15 @@
   </main>
   </div>
 
-  <!-- 问一问：一直停在下面（宽屏在右边），随时可以问，不打分。文字和语音是同一条对话。
+  <!-- 问一问：平时收起，点开才出现（下面；宽屏在右边），随时可以问，不打分。文字和语音是同一条对话。
        交答案之前只能问基础知识（模型看不到题目）。 -->
   <aside id="dock" hidden aria-label="问一问">
     <div id="dock-grip" role="separator" tabindex="0"></div>
     <div class="dock-head">
       <b>问一问</b><span id="chat-scope" class="muted"></span>
       <span id="voice-status" class="muted" hidden></span>
-      <button id="voice-open" class="chip" hidden></button>
-      <button id="dock-fold" class="chip" aria-expanded="true">收起</button>
+      <button id="voice-open" class="chip" data-voice hidden></button>
+      <button id="dock-fold" class="chip" title="收起（⌘ /）">收起</button>
     </div>
     <div id="chat-thread" data-ask="chat"></div>
     <p id="chat-status" class="muted"></p>
@@ -91,6 +91,15 @@
       <button id="chat-send" class="primary">发送 ⌘↵</button>
     </div>
   </aside>
+  </div>
+
+  <!-- 问一问收起时，角落里只有这一小粒：点「问一问」展开，「语音」不用展开也能开。 -->
+  <div id="pill" hidden>
+    <p id="pill-note" hidden></p>
+    <div class="pill-row">
+      <button id="pill-ask" class="primary" title="问一问（⌘ /）" aria-controls="dock">问一问</button>
+      <button id="pill-voice" data-voice hidden></button>
+    </div>
   </div>
 
   <!-- 设置：用哪家服务、填 key。key 存在本机，只显示末尾四位。 -->
@@ -137,6 +146,9 @@
         <label for="DASHSCOPE_WORKSPACE_ID">业务空间 ID</label>
         <input type="text" id="DASHSCOPE_WORKSPACE_ID" name="DASHSCOPE_WORKSPACE_ID" autocomplete="off" spellcheck="false" placeholder="可以不填">
       </div>
+
+      <p class="muted">公式显示不对？<button type="button" class="link" id="formula-copy">复制这一步的公式</button><span id="formula-copied"></span><br>只复制公式，放在剪贴板里，不会发到任何地方；粘贴给开发者看就行。</p>
+      <textarea id="formula-text" rows="6" readonly hidden></textarea>
 
       <p id="settings-result" class="settings-result" role="status"></p>
       <div class="bar">

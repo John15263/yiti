@@ -18,8 +18,9 @@ export function askText(action, quote) {
   return text;
 }
 
-// After a question is answered, the ways in. A miss is explained without being asked (once, see wantsExplain), and what
-// is offered next depends on whether the tutor has already answered something here.
+// After a question is answered, the questions worth asking are one click away; which ones depends on whether the answer was a
+// miss and on whether the tutor has already answered something here. Nothing is asked for the learner: Math Academy shows
+// its own explanation after a miss, and a call is spent only when they choose to ask.
 export const WRONG_ASK = '我这道题答错了。请针对我选的（或填的）答案，讲讲我错在哪里，再讲正确的思路。';
 export function ideasFor(rec) {
   if (!answered(rec)) return [];
@@ -28,9 +29,6 @@ export function ideasFor(rec) {
   }
   return [...(wrong(rec) ? [{ label: '讲讲我错在哪', text: WRONG_ASK }] : []), { label: '这道题怎么做', text: '请一步一步讲讲这道题正确的做法。' }];
 }
-// A miss is explained on its own only when it was seen happening: this page watched the question open and then answered
-// wrong. Opening a step that was answered long ago, or reading a page again, never spends a call.
-export const wantsExplain = (rec, watched) => wrong(rec) && watched.has(rec.key) && !(rec.chat?.messages || []).some(m => m.text === WRONG_ASK);
 
 // Where on the page a selection may be taken from. A practice question not yet answered is the one thing the tutor must
 // not be handed: before the answer its own words (the question and its choices) get no shortcut, so it is never

@@ -138,7 +138,7 @@ class Parser {
     if (prime) sup = sup === null ? prime : `<mrow>${prime}${sup}</mrow>`;
     if (sub === null && sup === null) return base;
     // A sum or a limit carries its bounds above and below when it stands on its own line.
-    const over = base.limits && this.display;
+    const over = (base.limits && this.display) || base.stack;
     const tag = sub !== null && sup !== null ? (over ? 'munderover' : 'msubsup') : sub !== null ? (over ? 'munder' : 'msub') : (over ? 'mover' : 'msup');
     return { ml: `<${tag}>${base.ml}${sub ?? ''}${sup ?? ''}</${tag}>`, tail: base.tail };
   }
@@ -227,6 +227,9 @@ class Parser {
         const inner = this.arg();
         return { ml: name === 'mathrm' || name === 'operatorname' ? inner.replace(/<mi>/g, '<mi mathvariant="normal">') : inner };
       }
+      // A brace under (or over) something, with its label beyond it: the label goes under (or over) even inline.
+      case 'underbrace': return { ml: `<munder>${this.arg()}<mo>⏟</mo></munder>`, stack: true };
+      case 'overbrace': return { ml: `<mover>${this.arg()}<mo>⏞</mo></mover>`, stack: true };
       case 'overset': { const over = this.arg(); return { ml: `<mover>${this.arg()}${over}</mover>` }; }
       case 'underset': { const under = this.arg(); return { ml: `<munder>${this.arg()}${under}</munder>` }; }
       case 'left': {

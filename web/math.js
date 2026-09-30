@@ -49,9 +49,13 @@ function align(table) {
   else if (columns.length && columns.every(c => c === 'right')) table.setAttribute('data-align', 'right');
   else if (columns[0] === 'right' && columns[1] === 'left') table.setAttribute('data-align', 'alt');
 }
+// A formula written as a matrix (or an array, or cases) must come out as a table: MathML that lost its table is not drawn,
+// since a matrix run together on one line reads as other numbers.
+const TABULAR = /\\begin\{[A-Za-z]*(?:matrix|array|cases|align|gather)[A-Za-z*]*\}/;
 export function formula(part) {
-  // Math Academy's own MathML when it came with the formula; else what tex.js can make of the TeX.
-  const mml = part.mml || texToMathML(part.tex, part.display);
+  // Math Academy's own MathML when it came with the formula (and has its table); else what tex.js can make of the TeX.
+  const kept = part.mml && !(TABULAR.test(part.tex || '') && !/<mtable/.test(part.mml)) ? part.mml : '';
+  const mml = kept || texToMathML(part.tex, part.display);
   if (mml) {
     const parsed = new DOMParser().parseFromString(mml, 'text/html').body.firstElementChild;
     const math = parsed && rebuild(parsed);
@@ -77,7 +81,8 @@ export function draw(target, paras) {
 }
 // Text a model wrote, with its math between dollar signs; a formula that cannot be drawn shows as its TeX.
 export function rich(target, value) {
-  const parts = splitMath(typeof value === 'string' ? value : '');
+  // A formula cut off before it closed (older lists kept, from before cutting was careful) is not shown as raw TeX.
+  const parts = splitMath(typeof value === 'string' ? value : '').map((part, k, all) => part.t === 'math' || k < all.length - 1 ? part : { ...part, v: part.v.replace(/\$(?=\\)[^$]*$/, '…') });
   // A formula on its own line is already a block: the line breaks around it are not blank lines as well.
   const nodes = parts.map((part, k) => {
     if (part.t === 'math') return formula({ t: 'math', tex: part.tex, display: part.display, mml: texToMathML(part.tex, part.display) || '' });

@@ -116,18 +116,6 @@ test('what is right or wrong is what Math Academy said', async () => {
   assert.equal(wrong({ step: { type: 'example' }, sections: { result: 'Incorrect' } }), false);
 });
 
-test('a miss is explained without being asked, once, and only when it was seen happening', async () => {
-  const { wantsExplain, WRONG_ASK } = await import('../web/ask.js');
-  const watched = new Set(['k1']);
-  assert.equal(wantsExplain(question('Incorrect'), watched), true);
-  assert.equal(wantsExplain(question('Incorrect'), new Set()), false, 'a step opened after it was answered: nothing is spent');
-  assert.equal(wantsExplain(question('Correct'), watched), false);
-  assert.equal(wantsExplain(question(''), watched), false, 'not before the answer');
-  assert.equal(wantsExplain(question('Incorrect', [{ role: 'user', text: WRONG_ASK }, { role: 'assistant', text: '…' }]), watched), false, 'already asked');
-  assert.equal(wantsExplain(question('Incorrect', [{ role: 'user', text: '什么是矩阵？' }]), watched), true, 'a question asked before the answer is not this one');
-  assert.ok(WRONG_ASK.length <= 1000);
-});
-
 test('what is offered after the answer depends on the answer and on whether anything was explained yet', async () => {
   const { ideasFor, WRONG_ASK } = await import('../web/ask.js');
   assert.deepEqual(ideasFor(question('')), [], 'nothing before the answer');
@@ -138,4 +126,13 @@ test('what is offered after the answer depends on the answer and on whether anyt
   const talked = ideasFor(question('Incorrect', [{ role: 'user', text: 'x' }, { role: 'assistant', text: 'y' }]));
   assert.deepEqual(talked.map(i => i.label), ['再讲简单一点', '举个类似的例子']);
   assert.ok([...ideasFor(question('Incorrect')), ...talked].every(i => i.text.length > 0 && i.text.length <= 1000));
+});
+
+test('the pane is closed until it is opened, and stays open for someone who had unfolded it', async () => {
+  const { isOpen } = await import('../web/dock.js');
+  assert.equal(isOpen({}), false); assert.equal(isOpen(null), false); assert.equal(isOpen(undefined), false);
+  assert.equal(isOpen({ h: 300 }), false, 'a size alone is not a choice to open');
+  assert.equal(isOpen({ open: true }), true); assert.equal(isOpen({ open: false }), false);
+  assert.equal(isOpen({ folded: false }), true, 'unfolded before it could be closed'); assert.equal(isOpen({ folded: true }), false);
+  assert.equal(isOpen({ open: false, folded: false }), false, 'the newer choice wins');
 });

@@ -18,7 +18,27 @@ export const SCHEMAS = {
     phrases: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['en', 'zh'], properties: { en: str, zh: str } } } } },
 };
 // Text a model wrote may have math in it ($…$); mend puts back the backslashes JSON turned into control characters.
-export const cut = (v, n) => typeof v === 'string' ? mend(v.trim()).slice(0, n) : '';
+// A cut never lands inside a formula: cutting `$a=\\frac{b}{c}$` in the middle would leave a `$` that opens nothing, and the page
+// would show the rest as raw TeX. A formula the cut falls in is kept whole if it ends soon after the limit, else left out.
+const SLACK = 300;
+export function cutMath(text, n) {
+  if (text.length <= n) return text;
+  for (let i = 0; i < text.length;) {
+    if (text[i] === '\\') { i += 2; continue; }
+    if (text[i] !== '$') { i++; continue; }
+    const mark = text.startsWith('$$', i) ? '$$' : '$';
+    let end = i + mark.length;
+    for (; end < text.length && !text.startsWith(mark, end); end += text[end] === '\\' ? 2 : 1);
+    // No closing mark: a dollar sign that is only a dollar sign (money).
+    if (end >= text.length) { i += mark.length; continue; }
+    end += mark.length;
+    if (i >= n) break;
+    if (end > n) return end <= n + SLACK ? text.slice(0, end) : text.slice(0, i).trimEnd();
+    i = end;
+  }
+  return text.slice(0, n);
+}
+export const cut = (v, n) => typeof v === 'string' ? cutMath(mend(v.trim()), n) : '';
 
 // The size and wait each call is given.
 export const LIMITS = cfg => ({ translate: { tokens: 8192, limit: 40000, timeout: cfg.geminiPreparationTimeout, cheap: true } });

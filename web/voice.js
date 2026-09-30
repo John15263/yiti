@@ -37,13 +37,16 @@ export function createVoice({ getRecord, available = () => true, onChange = () =
     const rec = getRecord(), m = voiceMode(rec);
     // Voice needs a Gemini key even when the text calls go to another provider.
     const can = !!m && available();
-    $('voice-open').hidden = !can && !live;
-    $('voice-open').textContent = live ? `● ${elapsed()}` : '语音 ⌘]';
-    $('voice-open').title = live ? '结束语音（⌘ ]）' : `${LABELS[m?.mode] || '语音陪练'}（⌘ ]）`;
-    $('voice-open').classList.toggle('live', live);
+    // The button in the pane and the one in the corner are the same button.
+    for (const button of document.querySelectorAll('[data-voice]')) {
+      button.hidden = !can && !live;
+      button.textContent = live ? `● ${elapsed()}` : '语音 ⌘]';
+      button.title = live ? '结束语音（⌘ ]）' : `${LABELS[m?.mode] || '语音陪练'}（⌘ ]）`;
+      button.classList.toggle('live', live);
+    }
     const line = live ? [!sessionID ? '正在连接…' : sources.size ? '陪练在讲' : '在听，你可以提问', usd === undefined ? '' : money(usd)].filter(Boolean).join(' · ') : status;
     $('voice-status').textContent = line; $('voice-status').title = line; $('voice-status').hidden = !line;
-    onChange();
+    onChange({ line, live });
   }
   function note(role, text) {
     const last = lines.at(-1);
@@ -145,7 +148,7 @@ export function createVoice({ getRecord, available = () => true, onChange = () =
     silence(); free({ stream, capture, playback }); stream = null; capture = null; playback = null;
     paint();
   }
-  $('voice-open').onclick = () => toggle();
+  for (const button of document.querySelectorAll('[data-voice]')) button.onclick = () => toggle();
   function toggle() { if (live) { status = '语音已结束。'; stop(); } else void start(); }
   return {
     toggle,

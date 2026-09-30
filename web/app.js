@@ -1,11 +1,12 @@
 import { draw, rich } from './math.js';
-import { learnParas, isContent, isQuestion, answered, unanswered, correct } from './mode.js';
+import { learnParas, isContent, isQuestion, answered, correct } from './mode.js';
 import { createVoice, headingOf } from './voice.js';
 import { createDock } from './dock.js';
 import { createPick } from './pick.js';
-import { askText, ideasFor, wantsExplain, WRONG_ASK } from './ask.js';
+import { askText, ideasFor } from './ask.js';
 import { threadItems } from './thread.js';
 import { sizeOf, stepSize, percent, SIZES } from './size.js';
+import { formulaReport } from './report.js';
 import { createSettings } from './settings.js';
 import { request, subscribe } from './backend.js';
 import { newestOnly } from './order.js';
@@ -64,6 +65,7 @@ function render(next) {
   build ||= next.build;
   const cur = next.current, rec = next.record, onStep = !!rec && STEP_PAGES.includes(cur?.page);
   dock.show(onStep);
+  syncPill(rec);
   $('where').textContent = !onStep ? '' : cur.page === 'review' ? '复习 · 练习题' : `${rec.step.index + 1} / ${rec.step.total} · ${KIND[rec.step.type] || ''}`;
   $('lang').hidden = !onStep;
   $('lang').textContent = lang === 'zh' ? 'EN' : '中';
@@ -92,7 +94,6 @@ function render(next) {
   renderSimpler(rec);
   renderTools(rec);
   drawChat(rec);
-  explainMiss(rec, next.gemini);
   // Waiting and errors for the whole step share one quiet line; an error can be clicked to try again.
   const retry = notes.find(n => n.retry);
   $('status-line').textContent = notes.map(n => n.text).join(' · ');
@@ -307,14 +308,27 @@ function drawIdeas(rec, running) {
     return button;
   }));
 }
-// A question this page watched being answered wrong is explained at once, in the conversation, once: what the miss was
-// and the way through. Anything else waits to be asked.
-const watched = new Set();
-function explainMiss(rec, hasKey) {
-  if (unanswered(rec)) { watched.add(rec.key); return; }
-  if (!wantsExplain(rec, watched) || !hasKey || rec.chat?.status === 'running') return;
-  dock.unfold();
-  if (sendChat(WRONG_ASK)) watched.delete(rec.key);
+// The corner pill, while the pane is closed: it says when an answer is being written, and marks one that came while it was
+// closed (per step: what was there when the pane was last open is not new).
+const seen = new Map();
+function syncPill(rec = record()) {
+  if (!rec) return;
+  const tutors = threadItems(rec, voice.pending()).filter(i => i.role === 'tutor').length;
+  if (dock.isOpen() || !seen.has(rec.key)) seen.set(rec.key, tutors);
+  const running = rec.chat?.status === 'running';
+  $('pill-ask').textContent = running ? '正在想…' : '问一问';
+  $('pill-ask').classList.toggle('fresh', !running && tutors > seen.get(rec.key));
+}
+// What the voice says of itself (it started, it stopped, why it could not) cannot be left in a pane that is closed: it
+// comes up beside the pill for a few seconds. What it says while on the air is in the timer.
+let noted = '', noteTimer = 0;
+function voiceNote({ line, live } = {}) {
+  const text = live ? '' : line || '';
+  if (text === noted) return;
+  noted = text;
+  clearTimeout(noteTimer);
+  $('pill-note').textContent = text; $('pill-note').hidden = !text || dock.isOpen();
+  if (text) noteTimer = setTimeout(() => { $('pill-note').hidden = true; }, 9000);
 }
 // What was typed and what was said, in order. Drawn again only when something in it changed (a call on the air asks for
 // this every second), so words selected in it stay selected, and the reader is not pulled down while reading up.
@@ -364,7 +378,7 @@ function sendChat(direct) {
 function askAbout(action, quote) {
   const rec = record();
   if (!rec) return;
-  dock.unfold();
+  dock.open();
   const text = askText(action, quote), box = $('chat-text');
   if (action !== 'quote' && sendChat(text)) return;
   box.value = box.value.trim() ? `${box.value.trimEnd()}\n${text}` : text;
@@ -403,16 +417,33 @@ addEventListener('keydown', event => {
   if (!mod || event.isComposing || !rec) return;
   // By physical key too, so another keyboard layout still has it.
   const key = event.code === 'BracketRight' ? ']' : event.key;
-  if (key === ']') { event.preventDefault(); dock.unfold(); voice.toggle(); return; }
+  if (key === ']') { event.preventDefault(); voice.toggle(); return; }
+  if (key === '/') { event.preventDefault(); if (dock.isOpen()) dock.close(); else { dock.open(); $('chat-text').focus(); } return; }
   if (event.key === 'Enter' && event.target === $('chat-text')) { event.preventDefault(); sendChat(); }
 });
 
+// For finding out why a formula is drawn wrongly: the step's formulas, as they came and as they were drawn, to the clipboard.
+$('formula-copy').onclick = async () => {
+  const rec = record(), note = $('formula-copied'), box = $('formula-text');
+  box.hidden = true;
+  if (!rec) { note.textContent = ' 现在没有在看的一步。'; return; }
+  const made = new Map([...document.querySelectorAll('math[data-tex]')].map(m => [m.getAttribute('data-tex'), m.outerHTML]));
+  const text = JSON.stringify(formulaReport(rec, { agent: navigator.userAgent, version: globalThis.chrome?.runtime?.getManifest?.().version || state?.build || '', drawn: tex => made.get(tex) }), null, 1);
+  try { await navigator.clipboard.writeText(text); note.textContent = ' 已复制，粘贴给开发者就行。'; }
+  catch { box.value = text; box.hidden = false; box.select(); note.textContent = ' 不能自动复制：下面的文字全选复制就行。'; }
+};
+
 const settings = createSettings();
 $('settings-open').onclick = () => void settings.open();
-const dock = createDock({ dock: $('dock'), grip: $('dock-grip'), fold: $('dock-fold') });
-const voice = createVoice({ getRecord: record, available: () => state?.voice !== false, onChange: () => drawThread(record()) });
+// Opened, the pane shows the newest turn and has nothing new to point at; closed, only the corner pill is there.
+const dock = createDock({ dock: $('dock'), grip: $('dock-grip'), close: $('dock-fold'), pill: $('pill'), onToggle: opened => {
+  if (opened) { $('pill-note').hidden = true; grow(); $('chat-thread').scrollTop = $('chat-thread').scrollHeight; }
+  syncPill();
+} });
+const voice = createVoice({ getRecord: record, available: () => state?.voice !== false,
+  onChange: status => { drawThread(record()); syncPill(); voiceNote(status); } });
 createPick({ getRecord: record, onAsk: askAbout });
-$('voice-open').addEventListener('click', () => dock.unfold());
+$('pill-ask').onclick = () => { dock.open(); $('chat-text').focus(); };
 
 subscribe(value => { $('connection').hidden = true; if (isNewest(value)) render(value); },
   () => { $('connection').textContent = '和一题断开了，正在重连…'; $('connection').hidden = false; });
