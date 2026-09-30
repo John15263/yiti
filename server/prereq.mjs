@@ -3,19 +3,23 @@ import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
 import { parasText } from './capture.mjs';
 import { prompt, cut } from './teach.mjs';
 import { lessonTitles } from './board.mjs';
+import { isContent, isQuestion, unanswered, learnParas } from '../web/mode.js';
 
-// 前置知识: before a practice question is answered, the more basic concepts, methods and formulas it rests on,
-// listed for the learner to read. Math Academy schedules practice and reviews by the answers the learner gives
-// alone, so this may never help solve the question: no working, no answer, no choice, and nothing the lesson
-// itself is teaching (its own titles are sent along so the model can tell). Once the answer is in, the list is
-// not offered any more. The design is the same as the voice tutor's "prereq" mode (voice.mjs).
+// 前置知识: the more basic concepts, methods and formulas a step rests on, listed for the learner to read, and each
+// item opened up on request. It is offered on every step of a lesson.
+//
+// On a practice question not yet answered it may never help solve the question, because Math Academy schedules
+// practice and reviews by the answers the learner gives alone: no working, no answer, no choice, and nothing the
+// lesson itself is teaching (its step titles are sent along so the model can tell). An item opened up there is
+// shown only the item, never the question. On a tutorial or a worked example, or a question already answered,
+// there is nothing to hold back. Asks made before the answer are counted (they are part of what the answer was).
+// The design is the same as the voice tutor's "prereq" mode (voice.mjs).
 const now = () => new Date().toISOString();
 const KINDS = ['concept', 'method', 'formula'];
 const MAX_ITEMS = 6;
 export const PREREQ_SCHEMA = { type: 'object', additionalProperties: false, required: ['items'], properties: { items: { type: 'array', items: {
   type: 'object', additionalProperties: false, required: ['kind', 'name', 'note'],
   properties: { kind: { type: 'string', enum: KINDS }, name: { type: 'string' }, note: { type: 'string' } } } } } };
-
 // One item of the list, opened up: what it is, a small example of its own, and where it is easy to go wrong.
 export const EXPAND_SCHEMA = { type: 'object', additionalProperties: false, required: ['explain', 'example', 'pitfall'],
   properties: { explain: { type: 'string' }, example: { type: 'string' }, pitfall: { type: 'string' } } };
@@ -25,14 +29,19 @@ export function moreOf(value) {
   return more.explain ? more : null;
 }
 
-export const unanswered = rec => rec?.step?.type === 'question' && !rec.sections?.result;
 const choicesOf = rec => (rec.sections.choices || []).map(c => `${c.letter}. ${parasText(c.content)}`);
+// Whether there is anything on the step to list the prerequisites of.
+const hasContent = rec => isQuestion(rec) ? !!rec.sections.question?.length : isContent(rec) && !!(learnParas(rec).length || rec.sections.question?.length);
 
-// What the model is shown: the question and its choices as they are, and what the lesson teaches (its steps' titles,
-// each with the sentence saying what it covered, once it has been split into blocks). Nothing else
-// of this step, and there is nothing to show of an answer yet.
-export const prereqPacket = (rec, lesson) => ({ 这一步: rec.title || '', ...(lesson.length ? { 这节课在教: lesson } : {}),
-  题目: parasText(rec.sections.question), ...(choicesOf(rec).length ? { 选项: choicesOf(rec) } : {}) });
+// What the model is shown. A question: the question and its choices as they are (nothing of an answer, there is none
+// yet in what is kept here), and what the lesson teaches. A tutorial or example: its own text, and the lesson's
+// other steps.
+export function prereqPacket(rec, lesson) {
+  if (isQuestion(rec)) return { 这一步: rec.title || '', ...(lesson.length ? { 这节课在教: lesson } : {}), 题目: parasText(rec.sections.question), ...(choicesOf(rec).length ? { 选项: choicesOf(rec) } : {}) };
+  const others = lesson.filter(t => t !== rec.title);
+  return { 这一步: rec.title || '', 类型: rec.step.type === 'example' ? '例题' : '讲解',
+    ...(rec.step.type === 'example' ? { 题目: parasText(rec.sections.question) } : {}), 内容: parasText(learnParas(rec)), ...(others.length ? { 这节课的其他步骤: others } : {}) };
+}
 
 // The list as it is kept: known kinds only, no repeats, at most six, concepts first. An item that holds one of the
 // choices as written would be an answer, so it is dropped.
@@ -59,22 +68,21 @@ export class Prereqs {
       if (touched) board.store.putStep(rec);
     }
   }
-  // Asked for by the learner, for the question on screen. Every ask is counted (it is part of what the answer was),
-  // and a list already made is shown again without a new call.
+  // Asked for by the learner, for the step on screen. An ask made before the answer is counted, and a list already
+  // made is shown again without a new call.
   start(body) {
     fields(body, ['key'], ['key']);
     const rec = this.board.active(body.key);
-    check(unanswered(rec), '前置知识只在交答案之前提供。', 409);
-    check(rec.sections.question?.length, '还没有读到题目。', 409);
-    const views = (rec.prereq?.views || 0) + 1;
+    check(hasContent(rec), '这一步还没有读到内容。', 409);
+    const views = (rec.prereq?.views || 0) + (unanswered(rec) ? 1 : 0);
     if (['running', 'ready'].includes(rec.prereq?.status)) { rec.prereq.views = views; return this.board.save(rec); }
     check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
     const started = crypto.randomUUID();
-    rec.prereq = { status: 'running', id: started, views, started_at: now() };
+    rec.prereq = { ...(rec.prereq || {}), status: 'running', id: started, views, started_at: now(), items: undefined, error: undefined };
     this.board.save(rec);
-    const packet = prereqPacket(rec, lessonTitles(this.board.store, rec, true));
+    const packet = prereqPacket(rec, lessonTitles(this.board.store, rec));
     Promise.resolve().then(async () => {
-      const { value, model } = await this.infer(packet, { instructions: prompt('prereq'), schema: PREREQ_SCHEMA, purpose: 'prereq', key: rec.key, tokens: 4096, limit: 8000 });
+      const { value, model } = await this.infer(packet, { instructions: prompt(isQuestion(rec) ? 'prereq' : 'prereq-step'), schema: PREREQ_SCHEMA, purpose: 'prereq', key: rec.key, tokens: 4096, limit: 8000 });
       check(value && typeof value === 'object', 'Invalid model response');
       const items = itemsOf(value.items, rec);
       check(items.length, 'Invalid model response');
@@ -89,18 +97,17 @@ export class Prereqs {
     return rec;
   }
   // One item opened up, asked for by the learner. The model is shown the item and what the lesson teaches, and
-  // never the question: it cannot lean towards this question's working when it does not know the question.
-  // Each ask is counted like the list itself, and an item already opened is shown again without a new call.
+  // never the step's text or question: on a question not yet answered it cannot lean towards the question's working
+  // when it does not know the question. An item already opened is shown again without a new call.
   expand(body) {
     fields(body, ['key', 'item'], ['key', 'item']); id(body.item);
     const rec = this.board.active(body.key);
-    check(unanswered(rec), '前置知识只在交答案之前提供。', 409);
     const list = rec.prereq, item = list?.status === 'ready' ? list.items.find(i => i.id === body.item) : null;
     check(item, '这份前置知识清单已经变了，页面会刷新。', 409);
-    list.expands = (list.expands || 0) + 1;
+    if (unanswered(rec)) list.expands = (list.expands || 0) + 1;
     if (['running', 'ready'].includes(item.more?.status)) return this.board.save(rec);
     check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
-    const started = crypto.randomUUID(), lesson = lessonTitles(this.board.store, rec, true);
+    const started = crypto.randomUUID(), lesson = lessonTitles(this.board.store, rec);
     item.more = { status: 'running', id: started, started_at: now() };
     this.board.save(rec);
     const packet = { 知识点: { 类别: KIND_NAMES[item.kind], 名称: item.name, 说明: item.note }, ...(lesson.length ? { 这节课在教: lesson } : {}) };

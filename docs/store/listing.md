@@ -4,14 +4,14 @@
 
 ## 1. 上传包（Packages）
 
-上传 `dist/yiti-extension-0.3.5.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。2026-09-26 提交审核的是 0.3.1；审核期间不要上传新包（会重新排队），通过后再用新版本更新。
+上传 `dist/yiti-extension-0.4.0.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。2026-09-26 提交审核的是 0.3.1；审核期间不要上传新包（会重新排队），通过后再用新版本更新。
 
 包里的 `edge/_locales/<语言>/messages.json` 决定了商店里**不能再改**的两项，每种语言一份：
 
 | 语言 | 名称 | 简短描述 |
 |---|---|---|
-| zh_CN（默认） | `一题 · 数学课中文陪练` | `配合 Math Academy 的中文学习陪练：翻译、例题拆块先看懂再默写、做完题说一句关键步骤、语音补前置知识。用你自己的 API key，不经过第三方服务器。` |
-| en_US | `Yiti 一题 · Chinese companion for math lessons` | `A Chinese study companion for Math Academy: translation, worked examples in small blocks, a one-sentence review and a voice tutor.` |
+| zh_CN（默认） | `一题 · 数学课中文陪练` | `配合 Math Academy 的中文学习陪练：翻译、每一步背后的前置知识（可展开）、随时问一问、语音陪练。用你自己的 API key，不经过第三方服务器。` |
+| en_US | `Yiti 一题 · Chinese companion for math lessons` | `Chinese study companion for Math Academy: translation, the prerequisites behind each step, ask-anytime Q&A and a voice tutor.` |
 
 商店只给包里 `_locales` 有的语言开商店页：清单里名称和描述写死的话，只会出现一个 English (United States)。简短描述最多 132 个字符（构建时会检查）。
 
@@ -34,7 +34,7 @@
 ### Single Purpose Description
 
 ```
-Helps Chinese-speaking students study on Math Academy: in a side panel, it follows the lesson step the student has open, translates it into Chinese, splits worked examples into small blocks to understand and then write from memory, reviews a one-sentence summary after a question is answered, and offers a voice tutor for prerequisite knowledge. It never helps solve a practice question before the student has answered it.
+Helps Chinese-speaking students study on Math Academy: in a side panel, it follows the lesson step the student has open, translates it into Chinese, lists the more basic prerequisite knowledge behind the step (each item can be opened up for a fuller explanation), lets the student ask questions about the step at any time, and offers a voice tutor. It never helps solve a practice question before the student has answered it: until then the assistant is not even shown the question.
 ```
 
 ### Permission justification
@@ -45,9 +45,9 @@ Helps Chinese-speaking students study on Math Academy: in a side panel, it follo
 | storage | `Stores the user's settings (chosen AI provider and their own API key), learning records and usage counts locally in the browser. Nothing is sent to the developer.` |
 | unlimitedStorage | `Learning records keep each lesson step with its formulas (MathML) and the student's work; over many lessons this can exceed the default 10 MB local storage quota.` |
 | Host: mathacademy.com（内容脚本） | `A content script reads only the lesson step currently open on mathacademy.com (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along. On quizzes, reviews and other non-lesson pages it reads only the page type.` |
-| Host: generativelanguage.googleapis.com | `Calls the Google Gemini API with the user's own API key, when the user chooses Gemini for translation/checking or for the voice tutor.` |
-| Host: api.deepseek.com | `Calls the DeepSeek API with the user's own API key, when the user chooses DeepSeek for translation and checking.` |
-| Host: dashscope.aliyuncs.com, dashscope-intl.aliyuncs.com | `Calls Alibaba Cloud Model Studio (Qwen) with the user's own API key, when the user chooses Qwen for translation and checking.` |
+| Host: generativelanguage.googleapis.com | `Calls the Google Gemini API with the user's own API key, when the user chooses Gemini for translation and questions or for the voice tutor.` |
+| Host: api.deepseek.com | `Calls the DeepSeek API with the user's own API key, when the user chooses DeepSeek for translation and questions.` |
+| Host: dashscope.aliyuncs.com, dashscope-intl.aliyuncs.com | `Calls Alibaba Cloud Model Studio (Qwen) with the user's own API key, when the user chooses Qwen for translation and questions.` |
 | Host: *.maas.aliyuncs.com | `Opens the Qwen voice tutor over WebRTC at the user's own Model Studio workspace address (https://<workspace>.<region>.maas.aliyuncs.com), when the user chooses Qwen for voice. The subdomain is the user's workspace ID, so it cannot be listed in advance.` |
 
 Partner Center 里所有网站（Host）权限只有**一个**框，实际填的是合在一起的这段：
@@ -87,7 +87,9 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 | Extension logo（必填） | `logo-300.png` |
 | Small promotional tile | `tile-440x280.png` |
 | Large promotional tile | `tile-1400x560.png` |
-| Screenshots（按顺序） | `screenshot-1.png` 例题拆开讲 · `screenshot-2.png` 遮住自己写 · `screenshot-3.png` 语音问 · `screenshot-4.png` 一句话点评 · `screenshot-5.png` 设置 |
+| Screenshots（按顺序） | `screenshot-1.png` 例题拆开讲 · `screenshot-2.png` 遮住自己写 · `screenshot-3.png` 语音问 · `screenshot-4.png` 一句话点评 · `screenshot-5.png` 设置
+
+**这五张图是改版之前的界面（分块、默写、点评），上传前要重拍**：换成例题的中文全文、「前置知识」展开、「问一问」的对话、设置。 |
 
 截图里用的是一题自带的示例题（我们自己写的），不含 Math Academy 的内容。
 
@@ -98,12 +100,12 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 
 【它能做什么】
 · 中文翻译：把这一步的题目、选项和讲解翻成中文，公式原样保留；随时切回英文原文对照。
-· 例题拆开讲：把讲解和例题拆成几小块，每一块先用中文说清在做什么、为什么这样做；看懂了就遮住，凭理解自己写出来，马上检查——写错了告诉你错在哪、为什么。
-· 做完题说一句：交了答案之后（对错都行），用一句话说出这道题的关键一步，中文英文都行，马上得到分数、点评和改好的写法。
+· 前置知识：讲解、例题、练习题，每一步都能看到它背后更基础的概念、方法和公式；每一项可以「进一步展开」：讲清楚，给一个例子，说常见的误区。
+· 随时问一问：就这一步接着问，可以问很多轮，不打分。交了答案之后，什么都可以问，包括这道题怎么做。
 · 语音陪练：卡住时开口问，陪练用中文讲道理，英文说法原样念给你听。
 
 【它守的一条线】
-练习题交答案之前，一题不帮你解这道题。Math Academy 会根据你自己交的答案安排练习和复习；先被讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，最多用别的例子帮你补前置知识；交了之后再陪你弄懂。测验、复习等页面，一题不读取内容。
+练习题交答案之前，一题不帮你解这道题。Math Academy 会根据你自己交的答案安排练习和复习；先被讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，并帮你补前置知识：这时的「问一问」看不到你在做的题，只能讲基础知识；交了之后再陪你把这道题弄懂。测验、复习等页面，一题不读取内容。
 
 【怎么用】
 1. 点工具栏上的一题图标，侧边栏打开。
@@ -123,12 +125,12 @@ Yiti (一题) is a study companion for Math Academy, made for students who think
 
 What it does
 • Chinese translation: the step's question, choices and explanation in Chinese, with every formula kept as it is; switch back to the English original at any time.
-• Worked examples in small blocks: each block is explained in Chinese — what it does and why; then you hide it and write the step yourself from understanding, and get an immediate check that says what is wrong and why.
-• One sentence after each question: once you have answered (right or wrong), say the key step in one sentence, in Chinese or English, and get a score, feedback and a better wording.
+• Prerequisites: for every step — tutorial, worked example or practice question — the more basic concepts, methods and formulas it rests on; each item can be opened up for an explanation, an example of its own and a common pitfall.
+• Ask any time: keep asking about the step, as many turns as you like, nothing is scored. Once you have answered a practice question you can ask anything, including how it is solved.
 • Voice tutor: when stuck, just ask. It explains in Chinese and says the English terms as they are.
 
 The line it keeps
-Before you answer a practice question, Yiti does not help you solve it. Math Academy plans your practice and reviews from the answers you give on your own; being walked through first would make it think you have mastered the topic. So before you answer, Yiti only translates the question and, at most, fills in prerequisite knowledge with other examples. Quizzes and reviews are never read.
+Before you answer a practice question, Yiti does not help you solve it. Math Academy plans your practice and reviews from the answers you give on your own; being walked through first would make it think you have mastered the topic. So before you answer, Yiti only translates the question and fills in prerequisite knowledge: the assistant you ask at that point is not shown the question at all. Once you have answered, it walks you through it. Quizzes and reviews are never read.
 
 How to use
 1. Click the Yiti icon in the toolbar to open the side panel.
@@ -156,10 +158,11 @@ How to test without a Math Academy account (it is a paid service):
 1. Click the Yiti icon in the toolbar. The side panel opens and shows Settings.
 2. Under 文字 (text) choose "Gemini"; under 语音陪练 (voice) choose "Gemini Live". Paste this test key into "Gemini API key": PASTE_KEY_HERE
    Click "保存并测试" (save and test); both lines should show "✓ 可用" (available). Close the dialog.
-3. Click "先看一个示例" (try an example). A built-in worked example (written for this extension, not Math Academy content) opens, is translated into Chinese and split into blocks.
-4. Press the dark button "遮住，自己写" (hide and write), type anything, press the button again to have it checked. "下一块" goes to the next block.
-5. Click "语音 ⌘]" in the header to start the voice tutor; it starts explaining the current block. If the side panel cannot ask for the microphone, the extension opens a small tab to grant it once. Click the red timer to stop.
-6. "EN" in the header switches between Chinese and the English original.
+3. Click "先看一个示例" (try an example). A built-in worked example (written for this extension, not Math Academy content) opens and is translated into Chinese.
+4. Click "前置知识" (prerequisites): after a few seconds a list of basic concepts, methods and formulas appears. Click "进一步展开" (open up) next to an item for a fuller explanation.
+5. In the box at the bottom ("有疑问？问一问", ask a question) type a question about the example, e.g. "为什么这样算？", and press "发送" (send) or Cmd+Enter (Ctrl+Enter on Windows); the tutor answers in Chinese.
+6. Click "语音 ⌘]" in the header to start the voice tutor; it starts explaining the current step. If the side panel cannot ask for the microphone, the extension opens a small tab to grant it once. Click the red timer to stop.
+7. "EN" in the header switches between Chinese and the English original.
 
 On mathacademy.com, the content script reads only the lesson step currently open and sends it to the side panel; nothing is read on quizzes or reviews. All model calls go directly from the extension to the provider chosen in Settings, with the user's own key; there is no developer server.
 

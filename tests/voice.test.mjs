@@ -38,7 +38,7 @@ test('Qwen-Omni-Realtime: set up with the key in a header, and read back as the 
   up.open();
   const setup = up.sent[0];
   assert.equal(setup.type, 'session.update');
-  assert.match(setup.session.instructions, /一句话/);
+  assert.match(setup.session.instructions, /已经交了答案/);
   assert.equal(setup.session.audio.output.voice, 'longanlingxin');
   on.message(JSON.stringify({ type: 'audio', data: 'AAAA' }));
   assert.deepEqual(up.sent.at(-1), { type: 'input_audio_buffer.append', audio: 'AAAA' });

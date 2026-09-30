@@ -13,7 +13,7 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(to('web'), { recursive: true }); mkdirSync(to('server'), { recursive: true });
 
 // The engine: the server modules that run in a browser. Extensions serve .js reliably, so .mjs is renamed.
-const ENGINE = ['board', 'capture', 'chat', 'config', 'gemini', 'llm', 'prereq', 'settings', 'teach', 'translate', 'usage', 'validation', 'variant', 'voice', 'voice-providers'];
+const ENGINE = ['board', 'capture', 'chat', 'config', 'gemini', 'llm', 'prereq', 'settings', 'teach', 'translate', 'usage', 'validation', 'voice', 'voice-providers'];
 for (const name of ENGINE) {
   const code = readFileSync(from('server', `${name}.mjs`), 'utf8');
   if (/from 'node:/.test(code)) throw new Error(`server/${name}.mjs imports a Node module; it cannot run in the extension`);

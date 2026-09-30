@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { check, HttpError } from './validation.mjs';
 import { Board } from './board.mjs';
 import { Teach } from './teach.mjs';
-import { Variants } from './variant.mjs';
 import { Prereqs } from './prereq.mjs';
 import { Chats } from './chat.mjs';
 import './prompts-node.mjs';
@@ -19,8 +18,6 @@ import { Settings, testServices } from './settings.mjs';
 import { voiceConfigured } from './voice-providers.mjs';
 
 // Captures come from the extension, or from a Math Academy page itself; no other site can name these origins.
-// 换个样子: a variant of an answered question, and the lesson's round of them.
-const VARIANT_ACTIONS = { '/api/variant': 'start', '/api/variant/lesson': 'lesson', '/api/variant/check': 'check', '/api/variant/hint': 'hint', '/api/variant/next': 'next' };
 const CAPTURE_ORIGIN = /^(chrome-extension:\/\/[a-p]{32}|https:\/\/(www\.)?mathacademy\.com)$/;
 
 export function createServer({ store, cfg, settings = new Settings(), webRoot, token = randomBytes(32).toString('hex'), infer, connect }) {
@@ -32,11 +29,10 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();
-  const view = () => { const s = board.state(); return { ...s, lesson_ready: variants.offered(s.record), gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build }; };
+  const view = () => { const s = board.state(); return { ...s, gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build }; };
   const publish = () => { const data = `event: state\ndata: ${JSON.stringify(view())}\n\n`; for (const res of streams) res.write(data); };
   const board = new Board(store, publish);
   const teach = new Teach(board, cfg, infer);
-  const variants = new Variants(board, cfg, infer);
   const prereqs = new Prereqs(board, cfg, infer);
   const chats = new Chats(board, cfg, infer);
   const voice = new Voice(board, cfg, connect);
@@ -105,17 +101,13 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
         return;
       }
       if (req.method === 'POST') {
-        if (path === '/api/command') { board.command(await body(req)); return json(res, view()); }
         if (path === '/api/prereq') { prereqs.start(await body(req)); return json(res, view()); }
         if (path === '/api/chat') { chats.send(await body(req)); return json(res, view()); }
         if (path === '/api/chat/retry') { chats.retry(await body(req)); return json(res, view()); }
         if (path === '/api/prereq/expand') { prereqs.expand(await body(req)); return json(res, view()); }
         // The example written for 一题 itself, followed as if it were open on Math Academy.
         if (path === '/api/demo') { await body(req); board.capture(DEMO); return json(res, view()); }
-        const action = { '/api/prepare': 'prepare', '/api/translate': 'translate', '/api/check': 'check', '/api/say': 'say' }[path];
-        if (action) { teach[action](await body(req)); return json(res, view()); }
-        const variant = VARIANT_ACTIONS[path];
-        if (variant) { variants[variant](await body(req)); return json(res, view()); }
+        if (path === '/api/translate') { teach.translate(await body(req)); return json(res, view()); }
       }
       throw new HttpError(404, 'Not found');
     } catch (e) {
@@ -140,6 +132,6 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   });
   server.requestTimeout = 20000;
   server.headersTimeout = 10000;
-  return { server, board, teach, variants, prereqs, chats, voice, usage, token,
+  return { server, board, teach, prereqs, chats, voice, usage, token,
     closeStreams: () => { for (const res of streams) res.end(); for (const conn of sockets) conn.close(1001, 'Server stopping'); } };
 }

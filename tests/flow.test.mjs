@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../server/store.mjs';
+import { Board } from '../server/board.mjs';
 import { createServer } from '../server/http.mjs';
-import { normalize, paraText } from '../server/capture.mjs';
-import { blocksOf } from '../server/teach.mjs';
+import { normalize, paraText, fingerprint, textFingerprint } from '../server/capture.mjs';
 import { voiceMode } from '../web/mode.js';
+import '../server/prompts-node.mjs';
 
 const text = v => ({ t: 'text', v });
 const math = (tex, display = false) => ({ t: 'math', tex, display, mml: `<math><mi>${tex}</mi></math>` });
@@ -17,25 +18,21 @@ const example = {
       [text('The probability of drawing a red or blue marble is')], [math('\\frac{8}{10}', true)], [text('So the expected number is 48.')]],
   },
 };
-const question = (answered) => ({
+const tutorial = { page: 'lesson', task: '13061309', topic: '7222', step: { id: 't10001', type: 'tutorial', index: 0, total: 26 }, title: 'Expected Counts',
+  sections: { body: [[text('The expected count is the number of trials times the probability.')], [math('n \\cdot P', true)]] } };
+const question = answered => ({
   page: 'lesson', task: '13061309', topic: '7222', step: { id: 'q360462', type: 'question', index: 2, total: 26 }, title: 'Question 1',
-  sections: { question: [[text('A pocket contains 4 quarters…')]], choices: [{ letter: 'a', content: [[math('30')]], picked: true }],
+  sections: { question: [[text('A pocket contains 4 quarters…')]], choices: [{ letter: 'a', content: [[text('thirty coins in all')]], picked: true }],
     ...(answered ? { result: 'Correct', explanation: [[text('Multiply 50 by 3/5.')]] } : {}) },
 });
+const QUESTION_KEY = '13061309-q360462', EXAMPLE_KEY = '13061309-e24956';
 
 function fakeInfer(calls) {
   return async (packet, opts) => {
-    calls.push({ purpose: opts.purpose, packet });
-    if (opts.purpose === 'prepare') return { model: 'fake', value: { summary: '用概率估计次数', blocks: [
-      { start: 0, meaning: '公式', focus: '写出公式', answer: 'n * P', terms: [{ en: 'product', zh: '乘积' }], hints: ['想乘法', 'n × ?', 'n × P'] },
-      { start: 2, meaning: '算概率', focus: '写出概率', answer: '8/10', terms: [], hints: [] },
-      { start: 2, meaning: 'duplicate start is dropped', focus: '', answer: '', terms: [], hints: [] },
-      { start: 4, meaning: '结论', focus: '写出结果', answer: '48', terms: [], hints: [] }] } };
-    if (opts.purpose === 'check') return { model: 'fake', value: { verdict: packet.written.includes('P') ? 'pass' : 'adjust', note: 'ok', fixed: 'n * P' } };
+    calls.push({ purpose: opts.purpose, packet, opts });
     if (opts.purpose === 'chat') return { model: 'fake', value: { reply: '好的，接着说。' } };
     if (opts.purpose === 'prereq_expand') return { model: 'fake', value: { explain: '概率是可能性的大小。', example: '抛硬币，正面的概率是 1/2。', pitfall: '' } };
     if (opts.purpose === 'prereq') return { model: 'fake', value: { items: [{ kind: 'concept', name: '概率', note: '事件发生的可能性有多大。' }] } };
-    if (opts.purpose === 'say') return { model: 'fake', value: { score: 88, math: 'right', note: '成立', suggestion: 'Multiply 50 by 3/5.', changes: [{ from: 'multiple', to: 'multiply', why: '动词' }] } };
     throw new Error('unexpected');
   };
 }
@@ -53,7 +50,8 @@ async function harness(t, infer) {
     const res = await fetch(`${base}${path}`, { method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${'t'.repeat(64)}`, 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) });
     return { status: res.status, body: await res.json() };
   };
-  return { app, calls, capture, api, base };
+  const record = async () => (await api('/api/state')).body.record;
+  return { app, calls, capture, api, base, record };
 }
 
 test('captures are accepted only from the extension or Math Academy itself', async t => {
@@ -62,7 +60,7 @@ test('captures are accepted only from the extension or Math Academy itself', asy
   assert.equal((await capture(example, 'https://www.mathacademy.com')).status, 200);
   assert.equal((await capture(example)).status, 200);
   const { body } = await api('/api/state');
-  assert.equal(body.record.key, '13061309-e24956');
+  assert.equal(body.record.key, EXAMPLE_KEY);
   assert.equal(body.record.step.type, 'example');
 });
 
@@ -71,150 +69,62 @@ test('non-lesson pages keep no content', () => {
   assert.equal(paraText([text('a '), math('x^2'), text(' b')]), 'a $x^2$ b');
 });
 
-test('blocks always cover every paragraph once, in order', () => {
-  const blocks = blocksOf([{ start: 3 }, { start: 1 }, { start: 9 }, { start: 5 }], 7);
-  assert.deepEqual(blocks.map(b => [b.start, b.end]), [[0, 5], [5, 7]]);
-  assert.deepEqual(blocksOf([], 3).map(b => [b.start, b.end]), [[0, 3]]);
+test('each kind of step is one of three: something to read, a question to answer, a question answered', async t => {
+  const { capture, record } = await harness(t);
+  const modeOf = async payload => { await capture(payload); return voiceMode(await record()); };
+  assert.equal((await modeOf(tutorial)).mode, 'learn');
+  assert.equal((await modeOf(example)).mode, 'learn');
+  assert.equal((await modeOf(question(false))).mode, 'prereq', 'only the more basic knowledge, before the answer');
+  const done = await modeOf(question(true));
+  assert.equal(done.mode, 'answered'); assert.equal(done.key, `answered:${QUESTION_KEY}`);
+  assert.equal(voiceMode(null), null);
 });
 
-test('an example is learned block by block: learn, write, check, next', async t => {
-  const { capture, api, calls } = await harness(t);
-  await capture(example);
-  const key = '13061309-e24956';
-  await api('/api/prepare', { key }); await settle();
-  let rec = (await api('/api/state')).body.record;
-  assert.equal(rec.prep.status, 'ready');
-  assert.deepEqual(rec.prep.blocks.map(b => [b.start, b.end]), [[0, 2], [2, 4], [4, 5]]);
-  assert.equal(voiceMode(rec).mode, 'learn');
-  // The question is context; the blocks come from the explanation.
-  assert.match(calls[0].packet.题目, /bag contains \$3\$/);
-
-  assert.equal((await api('/api/check', { key, index: 0, text: 'n * P' })).status, 409, 'cannot check before hiding the block');
-  await api('/api/command', { type: 'write', key, index: 0 });
-  await api('/api/command', { type: 'hint', key, index: 0 });
-  await api('/api/check', { key, index: 0, text: 'n times P' }); await settle();
-  rec = (await api('/api/state')).body.record;
-  assert.equal(rec.progress.phase, 'checked');
-  assert.equal(rec.progress.inputs[0].attempts[0].verdict, 'pass');
-  assert.equal(rec.progress.inputs[0].attempts[0].hints, 1);
-  assert.equal(voiceMode(rec).mode, 'check');
-
-  await api('/api/command', { type: 'next', key, index: 0 });
-  assert.equal((await api('/api/command', { type: 'next', key, index: 0 })).status, 409, 'a stale index is refused');
-  await api('/api/command', { type: 'write', key, index: 1 });
-  await api('/api/command', { type: 'next', key, index: 1 });
-  await api('/api/command', { type: 'write', key, index: 2 });
-  await api('/api/command', { type: 'next', key, index: 2 });
-  rec = (await api('/api/state')).body.record;
-  assert.equal(rec.progress.phase, 'done');
-  assert.deepEqual(rec.progress.inputs.map(i => [i.passed, i.skipped]), [[true, false], [false, true], [false, true]]);
-});
-
-test('a question gets nothing until it is answered, then one sentence is reviewed', async t => {
+test('what was taken out is gone: blocks, hiding and writing, the key step, the variants', async t => {
   const { capture, api } = await harness(t);
-  await capture(question(false));
-  const key = '13061309-q360462';
-  let rec = (await api('/api/state')).body.record;
-  assert.equal(voiceMode(rec).mode, 'prereq', 'only prerequisites before answering');
-  assert.equal(rec.sections.explanation, undefined);
-  assert.equal((await api('/api/say', { key, text: 'Multiple 50 by 3/5.' })).status, 409);
-
   await capture(question(true));
-  rec = (await api('/api/state')).body.record;
-  assert.equal(voiceMode(rec).mode, 'say');
-  await api('/api/say', { key, text: 'Multiple 50 by 3/5.' }); await settle();
-  rec = (await api('/api/state')).body.record;
-  assert.equal(rec.say.attempts[0].score, 88);
-  assert.equal(rec.say.attempts[0].changes[0].to, 'multiply');
+  for (const path of ['/api/prepare', '/api/command', '/api/check', '/api/say', '/api/variant', '/api/variant/lesson', '/api/variant/check', '/api/variant/hint', '/api/variant/next']) {
+    assert.equal((await api(path, { key: QUESTION_KEY })).status, 404, path);
+  }
+  const rec = await record(api);
+  assert.equal(rec.prep, undefined); assert.equal(rec.progress, undefined); assert.equal(rec.say, undefined);
 });
-
-test('a question written where the key step goes is answered in the conversation, and is neither scored nor the key step', async t => {
-  const infer = async (packet, opts) => {
-    if (opts.purpose === 'say') return { model: 'fake', value: packet.sentence.includes('？')
-      ? { intent: 'question', score: 0, math: 'partly', note: '因为要先通分，分母一样才能直接加。弄懂之后可以再写一句关键一步。', suggestion: '', changes: [] }
-      : { intent: 'key_step', score: 92, math: 'right', note: '抓住了。', suggestion: 'Multiply 50 by 3/5.', changes: [] } };
-    if (opts.purpose === 'variant_make') return { model: 'fake', value: { items: [{ question_en: 'q', question_zh: '题', answer: '1', solution: '解', hint: '提示' }] } };
-    if (opts.purpose === 'chat') return { model: 'fake', value: { reply: '接着说。' } };
-    throw new Error('unexpected ' + opts.purpose);
-  };
-  const { capture, api } = await harness(t, infer);
-  await capture(question(true));
-  const key = '13061309-q360462';
-  await api('/api/say', { key, text: '为什么要通分？' }); await settle();
-  let rec = (await api('/api/state')).body.record;
-  const asked = rec.say.attempts[0];
-  assert.equal(asked.status, 'done'); assert.equal(asked.intent, 'question'); assert.equal(asked.suggestion, '');
-  assert.deepEqual(rec.chat.messages.map(m => [m.role, m.role === 'user' ? m.text : m.text.slice(0, 6)]), [['user', '为什么要通分？'], ['assistant', '因为要先通分']]);
-  assert.equal(voiceMode(rec).key, `say:${key}:open`, 'still waiting for the key step');
-  const early = await api('/api/variant', { key });
-  assert.equal(early.status, 409, 'a question does not start a variant'); assert.match(early.body.error, /关键一步/);
-  // The key step, written afterwards, is scored as before, and the conversation goes on.
-  await api('/api/say', { key, text: 'Multiply 50 by 3/5 to get the number of quarters.' }); await settle();
-  rec = (await api('/api/state')).body.record;
-  assert.equal(rec.say.attempts[1].intent, 'key_step'); assert.equal(rec.say.attempts[1].score, 92);
-  assert.equal(rec.chat.messages.length, 2, 'a key step is not put into the conversation');
-  assert.equal((await api('/api/variant', { key })).status, 200);
-  const sent = await api('/api/chat', { key, text: '还有别的办法吗？' });
-  assert.equal(sent.status, 200); assert.equal(sent.body.record.chat.status, 'running');
-  await settle();
-  assert.deepEqual((await api('/api/state')).body.record.chat.messages.slice(-2).map(m => m.text), ['还有别的办法吗？', '接着说。']);
-  assert.equal((await api('/api/chat/retry', { key })).status, 409, 'nothing failed');
-});
-
-test('the conversation is only for an answered question', async t => {
-  const { capture, api } = await harness(t);
-  await capture(question(false));
-  assert.equal((await api('/api/chat', { key: '13061309-q360462', text: '答案是什么？' })).status, 409);
-  await capture(example);
-  assert.equal((await api('/api/chat', { key: '13061309-e24956', text: '这一步是什么意思？' })).status, 409, 'not for an example');
-  assert.equal((await api('/api/state')).body.record.chat, undefined);
-});
-
-test('the list of prerequisites is offered over HTTP only before a question is answered', async t => {
-  const { capture, api } = await harness(t);
-  await capture(question(false));
-  const asked = await api('/api/prereq', { key: '13061309-q360462' });
-  assert.equal(asked.status, 200);
-  assert.equal(asked.body.record.prereq.status, 'running');
-  await settle();
-  const list = (await api('/api/state')).body.record.prereq;
-  assert.equal(list.status, 'ready'); assert.equal(list.items[0].name, '概率'); assert.equal(list.views, 1);
-  const opened = await api('/api/prereq/expand', { key: '13061309-q360462', item: list.items[0].id });
-  assert.equal(opened.status, 200); assert.equal(opened.body.record.prereq.items[0].more.status, 'running');
-  await settle();
-  assert.equal((await api('/api/state')).body.record.prereq.items[0].more.example, '抛硬币，正面的概率是 1/2。');
-  await capture(question(true));
-  assert.equal((await api('/api/prereq', { key: '13061309-q360462' })).status, 409, 'once the answer is in');
-  assert.equal((await api('/api/prereq/expand', { key: '13061309-q360462', item: list.items[0].id })).status, 409, 'nor an item of it');
-  await capture(example);
-  assert.equal((await api('/api/prereq', { key: '13061309-e24956' })).status, 409, 'not for an example');
-});
+async function record(api) { return (await api('/api/state')).body.record; }
 
 test('only the step being followed can be changed', async t => {
-  const { capture, api } = await harness(t);
+  const { capture, api, record } = await harness(t);
   await capture(example);
   await capture(question(false));
-  const res = await api('/api/prepare', { key: '13061309-e24956' });
-  assert.equal(res.status, 409);
+  assert.equal((await api('/api/prereq', { key: EXAMPLE_KEY })).status, 409);
+  assert.equal((await api('/api/chat', { key: EXAMPLE_KEY, text: '这一步是什么意思？' })).status, 409);
+  assert.equal((await api('/api/translate', { key: EXAMPLE_KEY })).status, 409);
   await capture({ page: 'quiz', task: '99', topic: '1' });
   const { body } = await api('/api/state');
   assert.equal(body.current.page, 'quiz');
   assert.equal(body.record, null);
+  void record;
 });
 
-test('records fingerprinted with the old hash keep their preparation and translation', async () => {
-  const { Board } = await import('../server/board.mjs');
-  const { fingerprint, textFingerprint } = await import('../server/capture.mjs');
+test('records made by older versions keep their translation, and what else they held is left where it was', () => {
   const store = new Store(':memory:');
   const sections = { explanation: [[text('Multiply.')]] };
   store.putStep({ key: '1-e2', task: '1', step: { id: 'e2', type: 'example', index: 0, total: 1 }, title: 'E', sections, hash: 'oldsha', text_hash: 'oldtext',
-    updated_at: 'x', prep: { status: 'ready', hash: 'oldsha', blocks: [{ start: 0, end: 1 }] }, translation: { status: 'ready', hash: 'oldtext' },
-    progress: { index: 0, phase: 'learn', inputs: [{ hints: 0, peeks: 0, skipped: false, passed: false, attempts: [] }] }, say: { attempts: [] }, voice: [] });
+    updated_at: 'x', prep: { status: 'running', hash: 'oldsha' }, translation: { status: 'ready', hash: 'oldtext' },
+    progress: { index: 0, phase: 'learn', inputs: [] }, say: { attempts: [] }, voice: [] });
   const rec = new Board(store).record('1-e2');
   assert.equal(rec.hash, fingerprint(sections));
-  assert.equal(rec.prep.hash, rec.hash);
-  assert.equal(rec.prep.status, 'ready');
   assert.equal(rec.translation.hash, textFingerprint(sections));
+  assert.equal(rec.translation.status, 'ready');
+  assert.equal(rec.prep.status, 'running', 'no longer looked at, and not touched');
+});
+
+test('the built-in example can be tried without Math Academy', async t => {
+  const { api } = await harness(t);
+  const { body } = await api('/api/demo', {});
+  assert.equal(body.current.key, '0-e1');
+  assert.equal(body.record.step.type, 'example');
+  assert.equal(body.record.sections.explanation.length, 6);
+  assert.ok(body.record.sections.explanation.flat().filter(p => p.t === 'math').every(p => p.mml.startsWith('<math')));
 });
 
 test('a reply is numbered lower than the push that follows it, however fast the model answers', async t => {
@@ -239,10 +149,10 @@ test('a reply is numbered lower than the push that follows it, however fast the 
     assert.equal(typeof first.boot, 'string');
     // The fake model answers at once: the reply below is taken before the job runs and says "running";
     // the push that says "ready" is taken after it, so it must carry the higher number.
-    const reply = await api('/api/prepare', { key: '13061309-e24956' });
-    assert.equal(reply.body.record.prep.status, 'running');
+    const reply = await api('/api/prereq', { key: EXAMPLE_KEY });
+    assert.equal(reply.body.record.prereq.status, 'running');
     let last;
-    do { last = await pushed(); } while (last.record.prep.status !== 'ready');
+    do { last = await pushed(); } while (last.record.prereq?.status !== 'ready');
     assert.equal(reply.body.boot, first.boot);
     assert.equal(last.boot, first.boot);
     assert.ok(first.seq < reply.body.seq, 'a later state has the higher number');
@@ -262,32 +172,84 @@ test('every page script is served by the local server', async t => {
   }
 });
 
-test('TeX a model wrote with its backslashes eaten by JSON is put back in blocks and reviews', async t => {
-  // What arrives when a model writes \begin, \frac, \neq and \theta with one backslash each and the reply parses.
-  const eaten = tex => tex.replace(/\\begin/g, '\begin').replace(/\\frac/g, '\frac').replace(/\\neq/g, '\neq').replace(/\\theta/g, '\theta');
+test('TeX a model wrote with its backslashes eaten by JSON is put back in the list and the conversation', async t => {
+  // What arrives when a model writes \frac, \neq and \theta with one backslash each and the reply parses.
+  const eaten = tex => tex.replace(/\\frac/g, '\frac').replace(/\\neq/g, '\neq').replace(/\\theta/g, '\theta');
   const infer = async (packet, opts) => {
-    if (opts.purpose === 'prepare') return { model: 'fake', value: { summary: 's', blocks: [{ start: 0, meaning: eaten('见 $\\frac{1}{2}$'), focus: 'f',
-      answer: 'a', terms: [], hints: [eaten('$\\begin{bmatrix}1&2\\end{bmatrix}$'), eaten('当 $a\\neq b$，角 $\\theta$'), 'h3'] }] } };
-    if (opts.purpose === 'say') return { model: 'fake', value: { score: 90, math: 'right', note: eaten('$\\frac{a}{b}$ 不能为 $b=0$'), suggestion: eaten('取 $\\theta$'), changes: [] } };
+    if (opts.purpose === 'prereq') return { model: 'fake', value: { items: [{ kind: 'formula', name: eaten('分式 $\\frac{a}{b}$'), note: eaten('当 $a\\neq b$，角 $\\theta$') }] } };
+    if (opts.purpose === 'chat') return { model: 'fake', value: { reply: eaten('这里 $\\frac{1}{2}\\neq 0$') } };
     throw new Error('unexpected');
   };
-  const { capture, api } = await harness(t, infer);
+  const { capture, api, record } = await harness(t, infer);
   await capture(example);
-  await api('/api/prepare', { key: '13061309-e24956' }); await settle();
-  const block = (await api('/api/state')).body.record.prep.blocks[0];
-  assert.equal(block.meaning, '见 $\\frac{1}{2}$');
-  assert.deepEqual(block.hints, ['$\\begin{bmatrix}1&2\\end{bmatrix}$', '当 $a\\neq b$，角 $\\theta$', 'h3']);
-  await capture(question(true));
-  await api('/api/say', { key: '13061309-q360462', text: 'Take theta.' }); await settle();
-  const said = (await api('/api/state')).body.record.say.attempts[0];
-  assert.equal(said.note, '$\\frac{a}{b}$ 不能为 $b=0$'); assert.equal(said.suggestion, '取 $\\theta$');
+  await api('/api/prereq', { key: EXAMPLE_KEY }); await settle();
+  const item = (await record()).prereq.items[0];
+  assert.equal(item.name, '分式 $\\frac{a}{b}$'); assert.equal(item.note, '当 $a\\neq b$，角 $\\theta$');
+  await api('/api/chat', { key: EXAMPLE_KEY, text: '为什么？' }); await settle();
+  assert.equal((await record()).chat.messages[1].text, '这里 $\\frac{1}{2}\\neq 0$');
 });
 
-test('the built-in example can be tried without Math Academy', async t => {
-  const { api } = await harness(t);
-  const { body } = await api('/api/demo', {});
-  assert.equal(body.current.key, '0-e1');
-  assert.equal(body.record.step.type, 'example');
-  assert.equal(body.record.sections.explanation.length, 6);
-  assert.ok(body.record.sections.explanation.flat().filter(p => p.t === 'math').every(p => p.mml.startsWith('<math')));
+test('the list of prerequisites is offered on every kind of step, and counted only before an answer', async t => {
+  const { capture, api, record, calls } = await harness(t);
+  await capture(question(false));
+  const asked = await api('/api/prereq', { key: QUESTION_KEY });
+  assert.equal(asked.status, 200); assert.equal(asked.body.record.prereq.status, 'running');
+  await settle();
+  const list = (await record()).prereq;
+  assert.equal(list.status, 'ready'); assert.equal(list.items[0].name, '概率'); assert.equal(list.views, 1);
+  assert.match(calls[0].packet.题目, /pocket contains 4 quarters/, 'a question: the question and its choices');
+  assert.equal(calls[0].packet.内容, undefined);
+  const opened = await api('/api/prereq/expand', { key: QUESTION_KEY, item: list.items[0].id });
+  assert.equal(opened.status, 200); assert.equal(opened.body.record.prereq.items[0].more.status, 'running');
+  await settle();
+  assert.equal((await record()).prereq.items[0].more.example, '抛硬币，正面的概率是 1/2。');
+  assert.deepEqual(Object.keys(calls.at(-1).packet).sort(), ['知识点'], 'an item opened up before the answer is shown nothing of the question');
+  assert.equal((await record()).prereq.expands, 1);
+  // The answer goes in on Math Academy: the list is still there, and asking again is no longer counted.
+  await capture(question(true));
+  assert.equal((await api('/api/prereq', { key: QUESTION_KEY })).status, 200);
+  assert.equal((await api('/api/prereq/expand', { key: QUESTION_KEY, item: list.items[0].id })).status, 200);
+  const after = (await record()).prereq;
+  assert.equal(after.views, 1); assert.equal(after.expands, 1);
+  // A tutorial or a worked example has one too, made from its own text.
+  await capture(example);
+  assert.equal((await api('/api/prereq', { key: EXAMPLE_KEY })).status, 200); await settle();
+  const own = calls.filter(c => c.purpose === 'prereq').at(-1);
+  assert.match(own.packet.内容, /product of trials and probability/); assert.equal(own.packet.类型, '例题');
+  assert.match(own.opts.instructions, /读 Math Academy 上的一段英文数学讲解或例题/);
+  assert.equal((await record()).prereq.views ?? 0, 0, 'nothing to count on a step that is not a question');
+  await capture(tutorial);
+  assert.equal((await api('/api/prereq', { key: '13061309-t10001' })).status, 200);
+});
+
+test('the conversation is offered on every kind of step, and before an answer the tutor never sees the question', async t => {
+  const { capture, api, record, calls } = await harness(t);
+  const sent = async (key, text) => { const r = await api('/api/chat', { key, text }); await settle(); return r; };
+  // A worked example: its whole text.
+  await capture(example);
+  assert.equal((await sent(EXAMPLE_KEY, '这一步为什么要乘？')).status, 200);
+  let asked = calls.filter(c => c.purpose === 'chat').at(-1);
+  assert.match(asked.packet.这一步的原文, /product of trials and probability/); assert.match(asked.packet.例题, /bag contains/);
+  assert.match(asked.opts.instructions, /读 Math Academy 上的一段英文数学讲解或例题/);
+  // A question not yet answered: not the question, not the choices, and nothing of an answer; only what is basic.
+  await capture(question(false));
+  await api('/api/prereq', { key: QUESTION_KEY }); await settle();
+  assert.equal((await sent(QUESTION_KEY, '概率是什么意思？')).status, 200);
+  asked = calls.filter(c => c.purpose === 'chat').at(-1);
+  const seen = JSON.stringify(asked.packet);
+  assert.ok(!seen.includes('pocket contains') && !seen.includes('thirty coins') && !seen.includes('Multiply 50'), 'the tutor is shown nothing of the question');
+  assert.deepEqual(Object.keys(asked.packet).sort(), ['他现在问', '前置知识清单', '状态'].sort().concat(asked.packet.这节课在教 ? ['这节课在教'] : []).sort());
+  assert.match(asked.packet.前置知识清单[0], /概率/);
+  assert.match(asked.opts.instructions, /看不到他在做的题/);
+  // Even when he pastes the question and asks for the answer, the tutor was built not to know it.
+  await sent(QUESTION_KEY, 'A pocket contains 4 quarters… 选哪个？');
+  assert.equal((await record()).chat.messages.length, 4);
+  // Answered: from here the working may be talked through.
+  await capture(question(true));
+  assert.equal((await sent(QUESTION_KEY, '为什么是乘 3/5？')).status, 200);
+  asked = calls.filter(c => c.purpose === 'chat').at(-1);
+  assert.equal(asked.packet.结果, 'Correct'); assert.match(asked.packet.官方讲解, /Multiply 50 by 3\/5/); assert.match(asked.packet.题目, /pocket contains 4 quarters/);
+  assert.equal(asked.packet.之前的对话.length, 4, 'what was said before the answer is still there');
+  assert.match(asked.opts.instructions, /已经交了答案/);
+  assert.equal((await api('/api/chat/retry', { key: QUESTION_KEY })).status, 409, 'nothing failed');
 });

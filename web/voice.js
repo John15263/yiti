@@ -3,10 +3,10 @@ import { openVoice, microphoneDenied } from './backend.js';
 // Live voice tutor: the page carries the microphone, never the API key; the local server owns the prompt
 // and records what was said. The audio side is 一句's, unchanged.
 const OUTPUT_RATE = 24000;
-const KINDS = { learn: '讲解', write: '默写陪练', check: '检查讲解', say: '一句讲解', prereq: '前置知识（交答案前）' };
+const KINDS = { learn: '讲解', answered: '讲这道题', prereq: '前置知识（交答案前）' };
 // What the voice button in the top bar does at this moment, said on hover; its face only says 语音 ⌘].
-const LABELS = { learn: '让陪练讲这一块', write: '默写时的陪练：只引导，不报答案', check: '让陪练讲这次检查', say: '让陪练讲这道题和你那一句', prereq: '问前置知识：不讲这道题的做法' };
-const headingOf = (mode, index) => `${Number.isInteger(index) ? `第 ${index + 1} 块 · ` : ''}${KINDS[mode] || '陪练'}`;
+const LABELS = { learn: '让陪练讲这一步', answered: '让陪练讲这道题', prereq: '问前置知识：不讲这道题的做法' };
+const headingOf = mode => KINDS[mode] || '陪练';
 
 function toBase64(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -22,11 +22,11 @@ function fromBase64(value) {
 // null: a service whose price is not known here; its usage is kept in tokens, never guessed.
 const money = value => value === null ? '费用见服务商控制台' : !value ? '$0' : value < 0.001 ? '< $0.001' : `$${value.toFixed(3)}`;
 
-export function createVoice({ getRecord, draftOf, available = () => true }) {
+export function createVoice({ getRecord, available = () => true }) {
   const $ = id => document.getElementById(id);
   let socket = null, capture = null, stream = null, playback = null, playHead = 0, sources = new Set();
-  let live = false, status = '', startedAt = 0, ticker = null, lines = [], sentDraft = '', usd = 0;
-  let modeKey = '', mode = '', heading = '', sessionID = '', generation = 0, ended = null, shownKey;
+  let live = false, status = '', startedAt = 0, ticker = null, lines = [], usd = 0;
+  let modeKey = '', heading = '', sessionID = '', generation = 0, ended = null, shownKey;
   // Conversations opened from this page about the moment on screen stay open to read; everything else is folded away.
   let mine = new Set();
 
@@ -46,7 +46,7 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
     $('voice-status').textContent = line; $('voice-status').hidden = !line;
     const past = (rec?.voice || []);
     if (ended && past.some(v => v.session_id === ended.id)) ended = null;
-    const blocks = past.map(v => ({ id: v.session_id, heading: headingOf(v.mode, v.index), lines: v.transcript }));
+    const blocks = past.map(v => ({ id: v.session_id, heading: headingOf(v.mode), lines: v.transcript }));
     if (ended) blocks.push({ id: ended.id, heading: ended.heading, lines: ended.lines });
     if (live) blocks.push({ id: sessionID, heading, lines });
     const here = blocks.filter(b => b.lines.length && (mine.has(b.id) || (live && b.id === sessionID)));
@@ -118,8 +118,8 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
     if (live || !m || !available()) return;
     const run = ++generation;
     // Cost is shown once the service has reported some; before that there is nothing to show.
-    live = true; lines = []; sentDraft = ''; usd = undefined; startedAt = Date.now(); sessionID = '';
-    modeKey = m.key; mode = m.mode; heading = headingOf(m.mode, m.index); status = ''; paint();
+    live = true; lines = []; usd = undefined; startedAt = Date.now(); sessionID = '';
+    modeKey = m.key; heading = headingOf(m.mode); status = ''; paint();
     // Each call answers only for itself: an old one still closing must never end the call that replaced it.
     let call = null;
     const message = value => {
@@ -150,13 +150,7 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
     if (run !== generation) { free(audio); return; }
     ({ stream, capture, playback } = audio); playHead = 0;
     if (call.transport === 'track') call.useMicrophone(stream);
-    ticker = setInterval(() => { if (!live) return; paint(); sendDraft(); }, 1000);
-  }
-  function sendDraft() {
-    if (mode !== 'write') return;
-    const value = draftOf();
-    if (value === sentDraft || !socket?.ready()) return;
-    sentDraft = value; socket.send({ type: 'draft', data: value });
+    ticker = setInterval(() => { if (live) paint(); }, 1000);
   }
   function stop(closeSocket = true) {
     generation++;
@@ -176,7 +170,7 @@ export function createVoice({ getRecord, draftOf, available = () => true }) {
   function toggle() { if (live) { status = '语音已结束。'; stop(); } else void start(); }
   return {
     toggle,
-    // Each moment has its own call: when the step, block or check changes, the call ends with it.
+    // Each moment has its own call: when the step changes, or a question gets its answer, the call ends with it.
     update() {
       const m = voiceMode(getRecord());
       if (live && m?.key !== modeKey) { status = m ? '到了下一段，语音结束。按 ⌘ ] 可以接着问。' : '这一步不开语音，语音结束。'; stop(); }

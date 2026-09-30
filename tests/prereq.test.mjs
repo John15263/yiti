@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../server/store.mjs';
 import { Board } from '../server/board.mjs';
-import { Prereqs, itemsOf, moreOf, unanswered } from '../server/prereq.mjs';
+import { Prereqs, itemsOf, moreOf } from '../server/prereq.mjs';
+import { unanswered } from '../web/mode.js';
 import '../server/prompts-node.mjs';
 
 const text = v => ({ t: 'text', v });
@@ -40,14 +41,6 @@ test('the basic knowledge a question rests on comes back grouped, concepts first
   assert.match(opts.instructions, /绝不能帮他解这道题/);
 });
 
-test('a lesson step already split into blocks says what it covered, so the model can tell what is new', async () => {
-  const { board, store, prereqs, calls } = setup({ items: good });
-  board.capture(example);
-  const e = board.record('9-e1'); e.prep = { status: 'ready', hash: e.hash, summary: '用通分把两个分数相加', blocks: [] }; store.putStep(e);
-  board.capture(question(false)); prereqs.start({ key: KEY }); await settle();
-  assert.deepEqual(calls[0].packet.这节课在教, ['Example: Adding Fractions：用通分把两个分数相加']);
-});
-
 test('nothing but the question, its choices and the lesson\'s titles is shown to the model', async () => {
   const { board, prereqs, calls } = setup({ items: good });
   board.capture(question(false, ['x', 'y'])); prereqs.start({ key: KEY }); await settle();
@@ -64,18 +57,35 @@ test('a list already made is shown again without another call, and every ask is 
   assert.equal(status(board).items.length, 3);
 });
 
-test('it is only offered before the answer, and only for a question', async () => {
+test('it is offered on every kind of step, and only an ask made before the answer is counted', async () => {
   const { board, prereqs, calls } = setup({ items: good });
-  board.capture(question(true));
-  assert.throws(() => prereqs.start({ key: KEY }), e => e.status === 409, 'answered');
-  board.capture(example);
-  assert.throws(() => prereqs.start({ key: '9-e1' }), e => e.status === 409, 'an example is not a question');
-  board.capture(question(false)); prereqs.start({ key: KEY }); await settle();
+  board.capture(example); board.capture(question(false));
+  prereqs.start({ key: KEY }); await settle();
+  assert.equal(status(board).views, 1);
   board.capture(question(true));                       // the answer goes in on Math Academy
-  assert.throws(() => prereqs.start({ key: KEY }), e => e.status === 409, 'the list is not offered again once answered');
-  assert.equal(calls.length, 1);
+  prereqs.start({ key: KEY });                         // the list is shown again, and that is not an ask made before the answer
+  assert.equal(status(board).views, 1); assert.equal(calls.length, 1);
   assert.equal(unanswered(board.record(KEY)), false);
+  // A worked example: made from its own text, with the lesson's other steps, and there is nothing to count.
+  board.capture({ ...example, step: { ...example.step, index: 2 }, title: 'Example: Adding Thirds' });
+  prereqs.start({ key: '9-e1' }); await settle();
+  const own = calls.at(-1);
+  assert.deepEqual(Object.keys(own.packet).sort(), ['内容', '类型', '这一步', '题目'].sort());
+  assert.equal(own.packet.类型, '例题'); assert.match(own.packet.内容, /common denominator/); assert.match(own.packet.题目, /one half and one third/);
+  assert.match(own.opts.instructions, /读 Math Academy 上的一段英文数学讲解或例题/);
+  assert.equal(status(board, '9-e1').status, 'ready'); assert.equal(status(board, '9-e1').views, 0);
   assert.throws(() => prereqs.start({ key: 'nothing-here' }), e => e.status === 409, 'only the step being followed');
+});
+
+test('a tutorial\'s list is made from its text, and the lesson\'s other steps are named apart', async () => {
+  const { board, prereqs, calls } = setup({ items: good });
+  board.capture(example);
+  board.capture({ page: 'lesson', task: '9', topic: '1', step: { id: 't1', type: 'tutorial', index: 1, total: 3 }, title: 'Common Denominators', sections: { body: [[text('Fractions with the same denominator add directly.')]] } });
+  prereqs.start({ key: '9-t1' }); await settle();
+  const { packet } = calls[0];
+  assert.equal(packet.类型, '讲解'); assert.equal(packet.题目, undefined); assert.match(packet.内容, /same denominator add directly/);
+  assert.deepEqual(packet.这节课的其他步骤, ['Example: Adding Fractions'], 'not its own title, which is what it teaches');
+  assert.equal(status(board, '9-t1').status, 'ready');
 });
 
 test('an item that holds a choice as written, a repeat, or something malformed is left out', () => {
@@ -167,12 +177,16 @@ test('an item already opened is shown again without another call, and every ask 
   assert.equal(status(board).items[1].more, undefined, 'other items are untouched');
 });
 
-test('an item can only be opened before the answer, from the list on screen', async () => {
+test('an item can only be opened from the list on screen, and after the answer it still can, uncounted', async () => {
   const { board, prereqs, item } = await listed();
   assert.throws(() => prereqs.expand({ key: KEY, item: 'not-in-the-list' }), e => e.status === 409);
   assert.throws(() => prereqs.expand({ key: KEY, item: item.id, extra: 1 }));
-  board.capture(question(true));                        // the answer goes in on Math Academy
-  assert.throws(() => prereqs.expand({ key: KEY, item: item.id }), e => e.status === 409, 'not once answered');
+  prereqs.expand({ key: KEY, item: item.id }); await settle();       // before the answer: counted
+  assert.equal(status(board).expands, 1);
+  board.capture(question(true));                                      // the answer goes in on Math Academy
+  prereqs.expand({ key: KEY, item: item.id });                        // shown again; no longer an ask made before the answer
+  assert.equal(status(board).expands, 1);
+  assert.equal(status(board).items[0].more.status, 'ready');
   const fresh = setup({ items: good });
   fresh.board.capture(question(false));
   assert.throws(() => fresh.prereqs.expand({ key: KEY, item: 'x' }), e => e.status === 409, 'no list yet');

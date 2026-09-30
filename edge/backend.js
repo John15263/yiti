@@ -3,7 +3,6 @@
 // every model is called directly from here. Nothing passes through a server of ours.
 import { Board } from '../server/board.js';
 import { Teach, usePrompts } from '../server/teach.js';
-import { Variants } from '../server/variant.js';
 import { Prereqs } from '../server/prereq.js';
 import { Chats } from '../server/chat.js';
 import { config } from '../server/config.js';
@@ -36,11 +35,10 @@ cfg.usage = {
 };
 
 const listeners = new Set();
-const view = () => { const s = board.state(); return { ...s, lesson_ready: variants.offered(s.record), gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build: null }; };
+const view = () => { const s = board.state(); return { ...s, gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build: null }; };
 const publish = () => { const value = view(); for (const listener of listeners) listener(value); };
 const board = new Board(store, publish);
 const teach = new Teach(board, cfg);
-const variants = new Variants(board, cfg);
 const prereqs = new Prereqs(board, cfg);
 const chats = new Chats(board, cfg);
 
@@ -58,16 +56,12 @@ if (last) capture(last);
 export async function request(path, body) {
   try {
     if (path === '/api/state') return view();
-    if (path === '/api/command') { board.command(body); return view(); }
     if (path === '/api/prereq') { prereqs.start(body); return view(); }
     if (path === '/api/prereq/expand') { prereqs.expand(body); return view(); }
     if (path === '/api/chat') { chats.send(body); return view(); }
     if (path === '/api/chat/retry') { chats.retry(body); return view(); }
     if (path === '/api/demo') { board.capture(DEMO); return view(); }
-    const action = { '/api/prepare': 'prepare', '/api/translate': 'translate', '/api/check': 'check', '/api/say': 'say' }[path];
-    if (action) { teach[action](body); return view(); }
-    const variant = { '/api/variant': 'start', '/api/variant/lesson': 'lesson', '/api/variant/check': 'check', '/api/variant/hint': 'hint', '/api/variant/next': 'next' }[path];
-    if (variant) { variants[variant](body); return view(); }
+    if (path === '/api/translate') { teach.translate(body); return view(); }
     if (path === '/api/settings' && body === undefined) return settings.view(cfg);
     if (path === '/api/settings') {
       const values = settings.patch(body);

@@ -17,12 +17,6 @@ export function id(value) {
   check(typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value), 'Invalid ID');
   return value;
 }
-// A correction's changes, one row each; anything malformed is dropped rather than failing the correction.
-export function changeRows(value) {
-  if (!Array.isArray(value)) return [];
-  return value.filter(c => c && typeof c.from === 'string' && typeof c.to === 'string' && typeof c.why === 'string' && c.to.trim())
-    .slice(0, 8).map(c => ({ from: c.from.slice(0, 300), to: c.to.slice(0, 300), why: c.why.slice(0, 200) }));
-}
 // A model's reply as JSON. One that writes TeX may leave a backslash single, and JSON refuses most letters after it
 // (\cdot, \sqrt, \alpha): those are doubled and the reply read again. Valid JSON is never touched.
 export function parseReply(raw) {

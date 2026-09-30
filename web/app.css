@@ -1,4 +1,4 @@
-/* 一题 · 和一句同一套纸面：一行顶栏，单列，一个主按钮；次要的都是小字。 */
+/* 一题 · 和一句同一套纸面：一行顶栏，单列；主要的是内容、前置知识和问一问，次要的都是小字。 */
 :root{font-family:Inter,"Helvetica Neue","PingFang SC","Hiragino Sans",sans-serif;color:#283b34;background:#fdfdfb;font-synthesis:none;--muted:#7a8781;--line:#e4e8e3;--accent:#2f5a74;--soft:#f2f5f6;--ink:#253f33;--good:#3b6e4a;--warn:#8a5a1f}
 *{box-sizing:border-box}body{margin:0;background:#fdfdfb}
 button{font:inherit;color:inherit;border:1px solid #cfd6dc;background:transparent;border-radius:999px;padding:10px 20px;min-height:42px;cursor:pointer;font-size:14px;transition:background .15s ease,border-color .15s ease}
@@ -43,22 +43,6 @@ mtable[data-fence=bar]{border-inline:1.5px solid currentColor}
 mtable[data-fence=dbar]{border-inline:4px double currentColor}
 mtable[data-fence=cases]{padding-inline:.85em .2em;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 100' preserveAspectRatio='none'%3E%3Cpath d='M9 1C4 1 5 6 5 14V38C5 45 3 50 1 50C3 50 5 55 5 62V86C5 94 4 99 9 99' fill='none' stroke='%23283b34' stroke-width='1.6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") left center/.6em 100% no-repeat}
 mtable[data-fence=brace]{padding-inline:.85em;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 100' preserveAspectRatio='none'%3E%3Cpath d='M9 1C4 1 5 6 5 14V38C5 45 3 50 1 50C3 50 5 55 5 62V86C5 94 4 99 9 99' fill='none' stroke='%23283b34' stroke-width='1.6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") left center/.6em 100% no-repeat,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 100' preserveAspectRatio='none'%3E%3Cpath d='M1 1C6 1 5 6 5 14V38C5 45 7 50 9 50C7 50 5 55 5 62V86C5 94 6 99 1 99' fill='none' stroke='%23283b34' stroke-width='1.6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") right center/.6em 100% no-repeat}
-#chat{margin:22px 0 6px;padding-top:16px;border-top:1px solid var(--line)}
-#chat .verdict-line{margin:0 0 4px}#chat .verdict-line .muted{margin-left:0}
-#chat-thread:empty{display:none}#chat-thread{margin:8px 0 4px}
-.chat-msg{font-size:15px;line-height:1.85;margin:0 0 10px;white-space:pre-wrap}
-.chat-msg b{font-weight:500;color:var(--muted);font-size:13px;margin-right:10px}
-.chat-msg.tutor{padding:9px 14px;background:var(--soft);border-radius:8px;color:var(--ink)}
-#chat-text{font-size:15px}
-.chat-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px 18px;margin:2px 0 6px}
-#chat-hint{margin:2px 0 0}
-#prereq{margin:6px 0 4px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fbfcfb}
-#prereq .verdict-line{margin:0 0 4px}#prereq h4{margin:12px 0 2px;font-size:13px;font-weight:500;color:var(--muted)}
-.prereq-items{list-style:none;margin:0;padding:0}.prereq-items li{font-size:15px;line-height:1.85;padding:2px 0}
-.prereq-items b{font-weight:500;margin-right:10px}.prereq-items span{color:var(--muted);font-size:14px}
-.prereq-items button.link{margin-left:10px}
-.prereq-more{margin:6px 0 10px;padding:10px 14px;background:var(--soft);border-radius:8px;font-size:14px;line-height:1.85;color:var(--ink)}
-.prereq-more p{margin:0 0 6px}.prereq-more p:last-child{margin:0}.prereq-more b{color:var(--muted);font-weight:500;margin-right:4px}
 mtable[data-align=left] mtd{text-align:left}
 mtable[data-align=right] mtd{text-align:right}
 mtable[data-align=alt] mtd:nth-child(odd){text-align:right}
@@ -70,31 +54,40 @@ code.tex{white-space:pre-wrap}
 .choices li p{margin:0}.choices li.picked{border-color:#4c5a63;background:#f3f5f6}
 .choices .letter{color:var(--muted);font-size:13px}
 
-#blocks,#ask,#say{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
-.dots{display:flex;gap:5px;list-style:none;padding:0;margin:0 0 14px}
-.dots li{width:22px;height:4px;border-radius:2px;background:var(--line)}
-.dots li.passed{background:#8fb39a}.dots li.skipped{background:#dcc894}.dots li.now{background:var(--accent)}
+/* 内容：讲解和例题的整段原文（中文），或者练习题的提示和对错 */
+#content{margin-top:14px;padding-top:0}
+#ask,#answer{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
 .original{background:var(--soft);border-radius:10px;padding:14px 16px 6px;margin:0 0 12px}
 .meaning{font-size:15px;line-height:1.9;margin:0 0 10px}
-.focus{font-size:18px;line-height:1.7;margin:0 0 4px;color:var(--ink)}
-.terms{list-style:none;padding:0;margin:0 0 6px;display:grid;gap:4px;font-size:14px;line-height:1.7}
-.terms b{font-weight:500;color:var(--accent);margin-right:10px}
-textarea{width:100%;resize:vertical;border:1px solid #d3dbe0;border-radius:10px;background:#fff;color:var(--ink);font:inherit;font-size:17px;line-height:1.7;padding:12px 14px;margin:6px 0 8px;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px #cddbe5}
-#write-text{font-family:"SF Mono",Menlo,"PingFang SC",monospace;font-size:16px}
-.hints{margin:0 0 6px;padding-left:20px;font-size:14px;line-height:1.8;color:var(--accent)}
 .verdict-line{font-size:15px;line-height:1.85;margin:6px 0 10px;white-space:pre-wrap}
 .verdict-line b{font-weight:500;margin-right:10px}
 .verdict-line b.pass{color:var(--good)}.verdict-line b.adjust{color:var(--warn)}
 .verdict-line .link,.verdict-line .muted{margin-right:12px}
-.fixed{font-size:16px;line-height:1.7;margin:0 0 12px;padding:9px 13px;border-left:3px solid #9bb7c9;background:#f7f9fa;white-space:pre-wrap}
-#checked-fixed{font-family:"SF Mono",Menlo,"PingFang SC",monospace;font-size:15px}
-.changes{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:6px;font-size:14px;line-height:1.7}
-.changes del{color:#a04630}.changes ins{text-decoration:none;color:var(--good)}.changes .why{color:var(--muted);margin-left:8px}
 
-/* 主按钮一行：一个主操作，次要操作是小字 */
+/* 前置知识 */
+.tools{margin:20px 0 8px}
+#prereq{margin:6px 0 4px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fbfcfb}
+#prereq .verdict-line{margin:0 0 4px}#prereq h4{margin:12px 0 2px;font-size:13px;font-weight:500;color:var(--muted)}
+.prereq-items{list-style:none;margin:0;padding:0}.prereq-items li{font-size:15px;line-height:1.85;padding:2px 0}
+.prereq-items b{font-weight:500;margin-right:10px}.prereq-items span{color:var(--muted);font-size:14px}
+.prereq-items button.link{margin-left:10px}
+.prereq-more{margin:6px 0 10px;padding:10px 14px;background:var(--soft);border-radius:8px;font-size:14px;line-height:1.85;color:var(--ink)}
+.prereq-more p{margin:0 0 6px}.prereq-more p:last-child{margin:0}.prereq-more b{color:var(--muted);font-weight:500;margin-right:4px}
+
+/* 问一问 */
+textarea{width:100%;resize:vertical;border:1px solid #d3dbe0;border-radius:10px;background:#fff;color:var(--ink);font:inherit;font-size:17px;line-height:1.7;padding:12px 14px;margin:6px 0 8px;outline:none;transition:border-color .15s ease,box-shadow .15s ease}
+textarea:focus{border-color:var(--accent);box-shadow:0 0 0 2px #cddbe5}
+#chat{margin:22px 0 6px;padding-top:16px;border-top:1px solid var(--line)}
+#chat .verdict-line{margin:0 0 4px}#chat .verdict-line .muted{margin-left:0}
+#chat-thread:empty{display:none}#chat-thread{margin:8px 0 4px}
+.chat-msg{font-size:15px;line-height:1.85;margin:0 0 10px;white-space:pre-wrap}
+.chat-msg b{font-weight:500;color:var(--muted);font-size:13px;margin-right:10px}
+.chat-msg.tutor{padding:9px 14px;background:var(--soft);border-radius:8px;color:var(--ink)}
+#chat-text{font-size:15px}
+.chat-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px 18px;margin:2px 0 6px}
+
+/* 设置里的一行按钮 */
 .bar{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:14px}
-.links{display:flex;gap:14px;align-items:center}
 
 /* 语音 */
 #voice{margin-top:26px;padding-top:12px;border-top:1px solid var(--line)}
@@ -120,6 +113,3 @@ dialog#settings::backdrop{background:rgba(30,40,36,.25)}
 #settings .settings-result .ok{color:var(--good)}#settings .settings-result .bad{color:#a04630}
 
 @media (max-width:560px){header,main{padding-left:16px;padding-right:16px}#settings .field{grid-template-columns:1fr}#settings .field .muted{grid-column:1}}
-#variant{margin:18px 0 0;padding:14px 0 0;border-top:1px solid #e3e8eb}
-#variant-question{white-space:pre-wrap}
-#variant-solution{white-space:pre-wrap;font-size:15px;line-height:1.85;padding-bottom:14px}

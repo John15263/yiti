@@ -32,79 +32,38 @@
       <p id="elsewhere-note" class="muted"></p>
     </section>
 
-    <!-- 一步：题目在上，当前这一块在中间，一个主按钮在下。 -->
+    <!-- 一步：内容在上（中文），然后是前置知识，最下面是问一问。讲解、例题、练习题都是这一套。 -->
     <section id="step" hidden>
       <p id="step-title" class="eyebrow"></p>
       <button id="status-line" class="status-line" hidden></button>
       <div id="context" class="mathtext"></div>
       <ol id="choices" class="choices" hidden></ol>
 
-      <div id="blocks" hidden>
-        <ol id="dots" class="dots" aria-label="块"></ol>
-        <div id="learn" hidden>
-          <div id="learn-original" class="original mathtext"></div>
-          <p id="learn-meaning" class="meaning"></p>
-          <ul id="learn-terms" class="terms" hidden></ul>
-        </div>
-        <div id="write" hidden>
-          <p id="write-focus" class="focus"></p>
-          <textarea id="write-text" rows="3" spellcheck="false" autocomplete="off" placeholder="写式子、写一句话都行"></textarea>
-          <ol id="hints" class="hints"></ol>
-          <div id="checked" hidden>
-            <p class="verdict-line"><b id="checked-verdict"></b><span id="checked-note"></span></p>
-            <p id="checked-fixed" class="fixed" hidden></p>
-            <div id="checked-original" class="original mathtext"></div>
-          </div>
-        </div>
-        <p id="done" class="meaning" hidden></p>
+      <!-- 讲解和例题：整段原文，翻成中文，不分块、不遮住、不默写。 -->
+      <div id="content" class="original mathtext" hidden></div>
+
+      <p id="ask" class="meaning" hidden>先在 Math Academy 做完、交答案，答错也没关系。<span class="muted">卡在基础上，看下面的前置知识，或者问一问。</span></p>
+
+      <!-- 练习题交了答案之后：对错和官方讲解。 -->
+      <div id="answer" hidden>
+        <p class="verdict-line"><b id="answer-result"></b><button id="answer-explain" class="link"></button><span id="answer-prior" class="muted"></span></p>
+        <div id="answer-explanation" class="original mathtext" hidden></div>
       </div>
 
-      <p id="ask" class="meaning" hidden>先在 Math Academy 做完、交答案，答错也没关系。<span class="muted">卡在基础上，点下面的「前置知识」看清单，或按 ⌘ ] 问语音。</span></p>
-
+      <div class="tools"><button id="prereq-toggle">前置知识</button></div>
       <div id="prereq" hidden>
-        <p class="verdict-line"><b>做这道题要用到的前置知识</b></p>
+        <p class="verdict-line"><b id="prereq-title"></b></p>
         <p id="prereq-status" class="muted"></p>
         <div id="prereq-list"></div>
-        <p class="muted">这是模型整理的参考，不是 Math Academy 的官方清单。只列更基础的知识，不涉及这道题怎么做，也不含这节课新教的内容。</p>
+        <p id="prereq-note" class="muted"></p>
       </div>
 
-      <div id="say" hidden>
-        <p class="verdict-line"><b id="say-result"></b><button id="say-explain" class="link"></button><span id="say-prior" class="muted"></span></p>
-        <div id="say-explanation" class="original mathtext" hidden></div>
-        <div id="say-review" hidden>
-          <p class="verdict-line"><b id="say-score"></b><span id="say-note"></span></p>
-          <p id="say-suggestion" class="fixed"></p>
-          <ul id="say-changes" class="changes"></ul>
-        </div>
-      </div>
-
-      <!-- 换个样子：同一个关键一步，换个情境再做一题；课的最后一步还有本课回顾。 -->
-      <div id="variant" hidden>
-        <p id="variant-title" class="eyebrow"></p>
-        <p id="variant-question" class="focus" hidden></p>
-        <textarea id="variant-text" rows="3" spellcheck="false" autocomplete="off" placeholder="写出算式和答案，只写答案也行" hidden></textarea>
-        <ol id="variant-hints" class="hints"></ol>
-        <div id="variant-checked" hidden>
-          <p class="verdict-line"><b id="variant-verdict"></b><span id="variant-note"></span></p>
-          <p id="variant-fixed" class="fixed" hidden></p>
-        </div>
-        <div id="variant-solution" class="original" hidden></div>
-      </div>
-
-      <!-- 交了答案之后：一个输入框。发送是问一问（多轮，不打分）；「作为关键一步交上去」才是打分点评，之后可以做换个样子。 -->
-      <div id="chat" hidden>
-        <p class="verdict-line"><b>有疑问？问一问</b><span class="muted">交了答案之后，什么都可以问，包括这道题怎么做。</span></p>
-        <p id="chat-note" class="muted" hidden></p>
+      <!-- 问一问：随时可以问，多轮，不打分。交答案之前只能问基础知识（模型看不到题目）。 -->
+      <div id="chat">
+        <p class="verdict-line"><b>有疑问？问一问</b><span id="chat-about" class="muted"></span></p>
         <div id="chat-thread"></div>
-        <textarea id="chat-text" rows="3" spellcheck="true" autocomplete="off" placeholder="问这道题的任何问题…  ⌘↵ 发送"></textarea>
-        <div class="chat-actions"><button id="chat-send">发送  ⌘↵</button><button id="chat-keystep" class="link">作为关键一步交上去</button><span id="chat-status" class="muted"></span></div>
-        <p id="chat-hint" class="muted">想再做一道「换个样子」的题？先用一句话写出这道题的关键一步（中文英文都行），点「作为关键一步交上去」：会打分、点评。</p>
-      </div>
-
-      <div id="bar" class="bar">
-        <button id="primary" class="primary" hidden></button>
-        <span id="links" class="links"></span>
-        <span id="work-status" class="muted" role="status"></span>
+        <textarea id="chat-text" rows="3" spellcheck="true" autocomplete="off"></textarea>
+        <div class="chat-actions"><button id="chat-send">发送  ⌘↵</button><span id="chat-status" class="muted"></span></div>
       </div>
       <p id="error" role="alert" hidden></p>
     </section>
@@ -124,7 +83,7 @@
       <h2>设置</h2>
       <p class="muted">key 只存在这台电脑上<!-- local-only -->（<code>data/settings.json</code>）<!-- /local-only --><!-- edge: （浏览器的插件存储） -->，保存后只显示末尾四位；只会发给对应的服务商。<!-- local-only -->这里的设置优先于 <code>.env</code>。<!-- /local-only --></p>
 
-      <h3>文字 <span class="muted">翻译、拆块、检查、点评</span></h3>
+      <h3>文字 <span class="muted">翻译、前置知识、问一问</span></h3>
       <div class="choice">
         <label><input type="radio" name="TEXT_PROVIDER" value="gemini"> Gemini</label>
         <label><input type="radio" name="TEXT_PROVIDER" value="deepseek"> DeepSeek</label>

@@ -1,25 +1,36 @@
 import { check, fields, text } from './validation.mjs';
 import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
 import { prompt, cut } from './teach.mjs';
-import { pushChat } from './board.mjs';
+import { pushChat, lessonTitles } from './board.mjs';
 import { contextOf } from './voice.mjs';
+import { isContent, answered, unanswered } from '../web/mode.js';
 
-// 追问: once a question is answered on Math Academy, the learner may go on asking about it in words, as many
-// turns as they like. Nothing here is scored, and this is the one place a question's working may be talked
-// through in full: the answer is in, so Math Academy already has what it needs from the learner alone. Before
-// the answer, only the prerequisite list is offered (prereq.mjs). A question typed where the key step is meant
-// to go lands here too (teach.mjs, "intent"). The design is the same as the voice tutor's "say" mode.
-const now = () => new Date().toISOString();
+// 问一问: the learner may ask about the step on screen at any time, in words, as many turns as they like. Nothing
+// here is scored. What the tutor is shown, and told, depends on the step, and is decided here from the record, never
+// by the page:
+//   content  — a tutorial or a worked example: its whole text; anything about it may be explained in full.
+//   answered — a practice question already answered on Math Academy: the question, the choices, the result and the
+//              official explanation; from here its working may be talked through in full, because the answer is in
+//              and Math Academy already has what it needs from the learner alone.
+//   prereq   — a practice question NOT yet answered: the tutor is not shown the question at all, only the
+//              prerequisite list (if there is one) and what the lesson teaches, so it can explain basic knowledge
+//              and cannot lean towards this question's working, however it is asked.
 const HISTORY = 12;
 export const CHAT_SCHEMA = { type: 'object', additionalProperties: false, required: ['reply'], properties: { reply: { type: 'string' } } };
-export const answered = rec => rec?.step?.type === 'question' && !!rec.sections?.result;
+export const chatMode = rec => isContent(rec) ? 'content' : answered(rec) ? 'answered' : unanswered(rec) ? 'prereq' : null;
+const PROMPTS = { content: 'chat-step', answered: 'chat', prereq: 'chat-prereq' };
+const KIND_NAMES = { concept: '基础概念', method: '基础方法', formula: '基础公式' };
 
-// What the model is shown: the same context the voice tutor gets after an answer, the last turns of the
-// conversation so far, and what was just said.
-export function chatPacket(rec) {
-  const messages = rec.chat.messages, last = messages.at(-1);
+// What the model is shown: the context for this kind of step, the last turns of the conversation so far, and what
+// was just said.
+export function chatPacket(rec, lesson = []) {
+  const messages = rec.chat.messages, last = messages.at(-1), mode = chatMode(rec);
   const before = messages.slice(0, -1).slice(-HISTORY).map(m => ({ [m.role === 'user' ? '他' : '陪练']: m.text }));
-  return { ...contextOf(rec, { mode: 'say' }), ...(before.length ? { 之前的对话: before } : {}), 他现在问: last.text };
+  const items = rec.prereq?.status === 'ready' ? rec.prereq.items.map(i => `${KIND_NAMES[i.kind]}：${i.name}（${i.note}）`) : [];
+  const context = mode === 'prereq' ? { 状态: '他还没交答案；你看不到他在做的题', ...(items.length ? { 前置知识清单: items } : {}), ...(lesson.length ? { 这节课在教: lesson } : {}) }
+    : mode === 'answered' ? contextOf(rec, { mode: 'answered' })
+    : contextOf(rec, { mode: 'learn' }, lesson);
+  return { ...context, ...(before.length ? { 之前的对话: before } : {}), 他现在问: last.text };
 }
 
 export class Chats {
@@ -33,7 +44,7 @@ export class Chats {
   send(body) {
     fields(body, ['key', 'text'], ['key', 'text']); text(body.text, 1000);
     const rec = this.board.active(body.key);
-    check(answered(rec), '交了答案之后才能追问。', 409);
+    check(chatMode(rec), '这一步现在不能问。', 409);
     check(rec.chat?.status !== 'running', '正在回答上一个问题，稍等。', 409);
     check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
     pushChat(rec, { role: 'user', text: body.text.trim() });
@@ -43,18 +54,18 @@ export class Chats {
   retry(body) {
     fields(body, ['key'], ['key']);
     const rec = this.board.active(body.key);
-    check(answered(rec), '交了答案之后才能追问。', 409);
+    check(chatMode(rec), '这一步现在不能问。', 409);
     check(rec.chat?.status === 'error' && rec.chat.messages.at(-1)?.role === 'user', '没有需要重试的问题。', 409);
     check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
     return this.reply(rec);
   }
   reply(rec) {
-    const started = crypto.randomUUID();
+    const started = crypto.randomUUID(), mode = chatMode(rec);
     rec.chat = { ...rec.chat, status: 'running', reply_id: started, error: undefined };
     this.board.save(rec);
-    const packet = chatPacket(rec);
+    const packet = chatPacket(rec, lessonTitles(this.board.store, rec));
     Promise.resolve().then(async () => {
-      const { value, model } = await this.infer(packet, { instructions: prompt('chat'), schema: CHAT_SCHEMA, purpose: 'chat', key: rec.key, tokens: 4096, limit: 12000 });
+      const { value, model } = await this.infer(packet, { instructions: prompt(PROMPTS[mode]), schema: CHAT_SCHEMA, purpose: 'chat', key: rec.key, tokens: 4096, limit: 12000 });
       const reply = cut(value?.reply, 3000);
       check(reply, 'Invalid model response');
       const latest = this.board.record(rec.key);
