@@ -9,12 +9,12 @@
 有 Node 24 或更新（`node --version`），就在仓库里构建：
 
 ```sh
-node edge/build.mjs    # 生成 dist/edge/，里面有 manifest.json
+node edge/build.mjs    # 生成 dist/extension/，里面有 manifest.json
 ```
 
 没有 Node 的话不用装，直接下载构建好的：到 https://github.com/John15263/yiti/releases 下载最新的 `yiti-extension-<版本>.zip`（有 `gh` 可以用 `gh release download --repo John15263/yiti --pattern '*.zip'`），解压到一个固定的位置，比如用户的「文稿」下的 `yiti-extension`。解压后的文件夹最外层应该直接有 `manifest.json`。
 
-**注意**：要加载的是 `dist/edge` 或解压出来的文件夹。仓库里的 `edge/` 是源代码，不是插件（里面只有 `manifest.template.json`），选它会加载失败。
+**注意**：要加载的是 `dist/extension` 或解压出来的文件夹。仓库里的 `edge/` 是源代码，仓库根目录的 `extension/` 是本机服务版用的小扩展，都不是这个插件（里面只有 `manifest.template.json`），选它会加载失败。
 
 ### 2. 加载插件（要用户自己点）
 
@@ -40,7 +40,7 @@ node edge/build.mjs    # 生成 dist/edge/，里面有 manifest.json
 
 ### 插件版常见问题
 
-- **"Could not load javascript 'extract.js'" 或"清单文件缺失"**：选错了文件夹，要选 `dist/edge` 或解压出来、最外层有 `manifest.json` 的文件夹。
+- **"Could not load javascript 'extract.js'" 或"清单文件缺失"**：选错了文件夹，要选 `dist/extension` 或解压出来、最外层有 `manifest.json` 的文件夹。
 - **侧边栏不跟着走**：刷新一下 Math Academy 的页面（插件装好之前打开的页面不会被读取）；确认是同一个窗口。
 - **更新插件**：拿到新版本后覆盖原来的文件夹，在扩展页面点一题的「重新加载」。学习记录和设置保留在浏览器里，不受影响。
 

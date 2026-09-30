@@ -4,7 +4,7 @@
 
 ## 1. 上传包（Packages）
 
-上传 `dist/yiti-extension-0.4.0.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。2026-09-26 提交审核的是 0.3.1；审核期间不要上传新包（会重新排队），通过后再用新版本更新。
+上传 `dist/yiti-extension-0.5.0.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。2026-09-26 提交审核的是 0.3.1；审核期间不要上传新包（会重新排队），通过后再用新版本更新。
 
 包里的 `edge/_locales/<语言>/messages.json` 决定了商店里**不能再改**的两项，每种语言一份：
 
@@ -44,7 +44,7 @@ Helps Chinese-speaking students study on Math Academy: in a side panel, it follo
 | sidePanel | `The whole extension is shown in the browser side panel, next to the Math Academy lesson.` |
 | storage | `Stores the user's settings (chosen AI provider and their own API key), learning records and usage counts locally in the browser. Nothing is sent to the developer.` |
 | unlimitedStorage | `Learning records keep each lesson step with its formulas (MathML) and the student's work; over many lessons this can exceed the default 10 MB local storage quota.` |
-| Host: mathacademy.com（内容脚本） | `A content script reads only the lesson step currently open on mathacademy.com (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along. On quizzes, reviews and other non-lesson pages it reads only the page type.` |
+| Host: mathacademy.com（内容脚本） | `A content script reads only the lesson step, or the review question, currently open on mathacademy.com (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along. On quizzes, diagnostics, assessments and other pages it reads only the page type.` |
 | Host: generativelanguage.googleapis.com | `Calls the Google Gemini API with the user's own API key, when the user chooses Gemini for translation and questions or for the voice tutor.` |
 | Host: api.deepseek.com | `Calls the DeepSeek API with the user's own API key, when the user chooses DeepSeek for translation and questions.` |
 | Host: dashscope.aliyuncs.com, dashscope-intl.aliyuncs.com | `Calls Alibaba Cloud Model Studio (Qwen) with the user's own API key, when the user chooses Qwen for translation and questions.` |
@@ -53,7 +53,7 @@ Helps Chinese-speaking students study on Math Academy: in a side panel, it follo
 Partner Center 里所有网站（Host）权限只有**一个**框，实际填的是合在一起的这段：
 
 ```
-mathacademy.com (content script): reads only the lesson step currently open (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along; on quizzes, reviews and other non-lesson pages it reads only the page type. The other hosts are AI providers, contacted directly with the user's own API key and only when the user chooses them in Settings: generativelanguage.googleapis.com (Google Gemini, text and voice); api.deepseek.com (DeepSeek, text); dashscope.aliyuncs.com and dashscope-intl.aliyuncs.com (Alibaba Cloud Model Studio / Qwen, text); *.maas.aliyuncs.com (Qwen voice over WebRTC at the user's own workspace address https://<workspace>.<region>.maas.aliyuncs.com, so the subdomain cannot be listed in advance). No developer server is contacted.
+mathacademy.com (content script): reads only the lesson step, or the review question, currently open (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along; on quizzes, diagnostics, assessments and other pages it reads only the page type. The other hosts are AI providers, contacted directly with the user's own API key and only when the user chooses them in Settings: generativelanguage.googleapis.com (Google Gemini, text and voice); api.deepseek.com (DeepSeek, text); dashscope.aliyuncs.com and dashscope-intl.aliyuncs.com (Alibaba Cloud Model Studio / Qwen, text); *.maas.aliyuncs.com (Qwen voice over WebRTC at the user's own workspace address https://<workspace>.<region>.maas.aliyuncs.com, so the subdomain cannot be listed in advance). No developer server is contacted.
 ```
 
 ### Are you using remote code?
@@ -100,12 +100,12 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 
 【它能做什么】
 · 中文翻译：把这一步的题目、选项和讲解翻成中文，公式原样保留；随时切回英文原文对照。
-· 前置知识：讲解、例题、练习题，每一步都能看到它背后更基础的概念、方法和公式；每一项可以「进一步展开」：讲清楚，给一个例子，说常见的误区。
-· 随时问一问：就这一步接着问，可以问很多轮，不打分。交了答案之后，什么都可以问，包括这道题怎么做。
-· 语音陪练：卡住时开口问，陪练用中文讲道理，英文说法原样念给你听。
+· 前置知识：讲解、例题、练习题，每一步都能看到它背后更基础的概念、方法和公式；每一项可以「进一步展开」（看不懂再点「更简单的解释」）；讲解、例题和交答案后的官方讲解也可以要一个「更简单的解释」：讲清楚，给一个例子，说常见的误区。
+· 随时问一问：停在页面下面（宽屏在右边），一边看前置知识一边问，可以问很多轮，不打分。看到不懂的话，划线点一下就问。交了答案之后，什么都可以问，包括这道题怎么做；答错了会自动讲讲错在哪。
+· 语音陪练：卡住时开口问，陪练用中文讲道理，英文说法原样念给你听；说的话和打的字在同一条对话里。
 
 【它守的一条线】
-练习题交答案之前，一题不帮你解这道题。Math Academy 会根据你自己交的答案安排练习和复习；先被讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，并帮你补前置知识：这时的「问一问」看不到你在做的题，只能讲基础知识；交了之后再陪你把这道题弄懂。测验、复习等页面，一题不读取内容。
+练习题交答案之前，一题不帮你解这道题。Math Academy 会根据你自己交的答案安排练习和复习；先被讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，并帮你补前置知识：这时的「问一问」看不到你在做的题，只能讲基础知识；交了之后再陪你把这道题弄懂。复习页面当作练习题；测验、诊断、测评等考核页面，一题不读取内容。
 
 【怎么用】
 1. 点工具栏上的一题图标，侧边栏打开。
@@ -130,7 +130,7 @@ What it does
 • Voice tutor: when stuck, just ask. It explains in Chinese and says the English terms as they are.
 
 The line it keeps
-Before you answer a practice question, Yiti does not help you solve it. Math Academy plans your practice and reviews from the answers you give on your own; being walked through first would make it think you have mastered the topic. So before you answer, Yiti only translates the question and fills in prerequisite knowledge: the assistant you ask at that point is not shown the question at all. Once you have answered, it walks you through it. Quizzes and reviews are never read.
+Before you answer a practice question, Yiti does not help you solve it. Math Academy plans your practice and reviews from the answers you give on your own; being walked through first would make it think you have mastered the topic. So before you answer, Yiti only translates the question and fills in prerequisite knowledge: the assistant you ask at that point is not shown the question at all. Once you have answered, it walks you through it. A review is treated like a practice question; quizzes, diagnostics and assessments are never read.
 
 How to use
 1. Click the Yiti icon in the toolbar to open the side panel.
@@ -160,11 +160,11 @@ How to test without a Math Academy account (it is a paid service):
    Click "保存并测试" (save and test); both lines should show "✓ 可用" (available). Close the dialog.
 3. Click "先看一个示例" (try an example). A built-in worked example (written for this extension, not Math Academy content) opens and is translated into Chinese.
 4. Click "前置知识" (prerequisites): after a few seconds a list of basic concepts, methods and formulas appears. Click "进一步展开" (open up) next to an item for a fuller explanation.
-5. In the box at the bottom ("有疑问？问一问", ask a question) type a question about the example, e.g. "为什么这样算？", and press "发送" (send) or Cmd+Enter (Ctrl+Enter on Windows); the tutor answers in Chinese.
-6. Click "语音 ⌘]" in the header to start the voice tutor; it starts explaining the current step. If the side panel cannot ask for the microphone, the extension opens a small tab to grant it once. Click the red timer to stop.
+5. In the box in the pane docked at the bottom ("问一问", ask a question) type a question about the example, e.g. "为什么这样算？", and press "发送" (send) or Cmd+Enter (Ctrl+Enter on Windows); the tutor answers in Chinese.
+6. Click "语音 ⌘]" in the 问一问 pane to start the voice tutor; it starts explaining the current step. If the side panel cannot ask for the microphone, the extension opens a small tab to grant it once. Click the red timer to stop.
 7. "EN" in the header switches between Chinese and the English original.
 
-On mathacademy.com, the content script reads only the lesson step currently open and sends it to the side panel; nothing is read on quizzes or reviews. All model calls go directly from the extension to the provider chosen in Settings, with the user's own key; there is no developer server.
+On mathacademy.com, the content script reads only the lesson step currently open and sends it to the side panel; nothing is read on quizzes, diagnostics or assessments. All model calls go directly from the extension to the provider chosen in Settings, with the user's own key; there is no developer server.
 
 DeepSeek and Alibaba Cloud Model Studio (Qwen) are alternative providers for the same features, chosen in the same Settings dialog and run through the same code; the Gemini test key above covers both text and voice, so no other key is needed. The key exists only for this review and will be deleted afterwards.
 ```

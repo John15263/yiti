@@ -6,7 +6,7 @@
 
 ## 一题读取的内容
 
-- **Math Academy 页面**：只在 mathacademy.com 上，只读你当前打开的这一步——题目和讲解的文字与公式、你选的答案、对错结果、交答案后显示的讲解。测验、复习、诊断等不是课程的页面，只读取页面类型（例如"测验"），不读内容。
+- **Math Academy 页面**：只在 mathacademy.com 上，只读你当前打开的这一步——题目和讲解的文字与公式、你选的答案、对错结果、交答案后显示的讲解。**复习页面**像练习题一样，读当前正在做的这一道题；测验、诊断、测评等考核页面，只读取页面类型（例如"测验"），不读内容。
 - **你在一题里输入的内容**：你在「问一问」里写的问题。
 - **语音**：只在你打开语音陪练时（点「语音」或按 ⌘ ]）使用麦克风，关掉即停止。
 - **API key**：你在「设置」里填写的服务商密钥。
@@ -24,6 +24,8 @@
 | 翻译 | 当前这一步的文字和公式 |
 | 前置知识清单 | 讲解和例题：这一步的文字和公式；练习题：题目和选项（不含答案和官方讲解） |
 | 展开前置知识 | 这个知识点的名称和说明（不含题目和这一步的文字） |
+| 前置知识的更简单的解释 | 同上，加上你刚看过的那一版讲法（也是模型写的，不含题目） |
+| 讲解和例题的更简单的解释 | 这一步的文字和公式，以及上一版讲法；练习题交答案之后：题目、选项、你选的、对错和官方讲解（交答案之前没有这个功能） |
 | 问一问 | 讲解和例题：这一步的文字和公式；练习题交答案之前：前置知识清单（不含题目）；交答案之后：题目、选项、你选的、对错和官方讲解；以及你和它聊过的最近几条、你这次问的话 |
 | 语音陪练 | 你的麦克风声音，以及当前这一步的相关内容 |
 
@@ -49,11 +51,11 @@
 
 一题 (Yiti) is an open-source study companion for Math Academy (a browser extension and a local server). **It has no developer server**: it does not collect, upload or sell any of your data, and has no analytics, ads or tracking.
 
-**What it reads.** On mathacademy.com only, the lesson step you have open: the text and formulas of the question and explanation, the answer you picked, whether it was correct, and the explanation shown after you answer. On quizzes, reviews, diagnostics and other non-lesson pages it reads only the kind of page, not its content. It also uses what you ask in 一题, your microphone only while you have a voice call open, and the API keys you enter in Settings.
+**What it reads.** On mathacademy.com only, the lesson step you have open: the text and formulas of the question and explanation, the answer you picked, whether it was correct, and the explanation shown after you answer. On a review page it reads the practice question being asked, as in a lesson; on quizzes, diagnostics, assessments and other pages it reads only the kind of page, not its content. It also uses what you ask in 一题, your microphone only while you have a voice call open, and the API keys you enter in Settings.
 
 **Where it is kept.** Only on your own computer: in the browser's extension storage (extension) or the app's `data/` folder (local server) — API keys, settings, learning records including voice transcripts, and model usage. The developer cannot see any of it. Uninstalling the extension (or deleting `data/`) deletes it all.
 
-**Who receives it.** To provide its features, 一题 sends the necessary content, with **your own API key**, directly to **the AI provider you choose** in Settings — Google (Gemini API), DeepSeek, or Alibaba Cloud Model Studio (Qwen) — and to no one else: the current step's text for translation and for the list of prerequisites; the name and note of one prerequisite when you open it up (never the question); your questions and the last few turns of the conversation, together with the step's text, or, for a practice question, its question, choices, result and explanation once answered (before it is answered, the tutor is not sent the question at all); your microphone audio and the current step's context during a voice call. Each provider's own terms and privacy policy apply to what it receives. Your data is not used for any other purpose and is not transferred to anyone else.
+**Who receives it.** To provide its features, 一题 sends the necessary content, with **your own API key**, directly to **the AI provider you choose** in Settings — Google (Gemini API), DeepSeek, or Alibaba Cloud Model Studio (Qwen) — and to no one else: the current step's text for translation and for the list of prerequisites; the name and note of one prerequisite when you open it up, and the telling you just read when you ask for a simpler one (never the question); on a tutorial or example, its text, or for a practice question already answered, its question, choices, result and explanation, when you ask for a simpler telling of it (there is none before the answer); your questions and the last few turns of the conversation, together with the step's text, or, for a practice question, its question, choices, result and explanation once answered (before it is answered, the tutor is not sent the question at all); your microphone audio and the current step's context during a voice call. Each provider's own terms and privacy policy apply to what it receives. Your data is not used for any other purpose and is not transferred to anyone else.
 
 **Children.** 一题 is meant for students. If you are under 14, use it with your parent's or guardian's consent and guidance, and follow the age requirements of the provider you choose.
 

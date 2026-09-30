@@ -12,6 +12,9 @@ export const isContent = rec => ['tutorial', 'example'].includes(rec?.step?.type
 export const isQuestion = rec => rec?.step?.type === 'question';
 export const answered = rec => isQuestion(rec) && !!rec.sections?.result;
 export const unanswered = rec => isQuestion(rec) && !rec.sections?.result;
+// Math Academy says "Correct" when it is; anything else it says of an answer (Incorrect, or partly right) is a miss.
+export const correct = rec => answered(rec) && /^correct/i.test(rec.sections.result);
+export const wrong = rec => answered(rec) && !correct(rec);
 // The paragraphs of a tutorial or example that carry what it teaches (an example's question is shown apart).
 export const learnParas = rec => rec?.step?.type === 'example' ? rec.sections?.explanation || [] : rec?.sections?.body || [];
 

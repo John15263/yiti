@@ -253,3 +253,61 @@ test('the conversation is offered on every kind of step, and before an answer th
   assert.match(asked.opts.instructions, /已经交了答案/);
   assert.equal((await api('/api/chat/retry', { key: QUESTION_KEY })).status, 409, 'nothing failed');
 });
+
+// A review page as the extension sends it: the practice question being asked, and nothing else of the page.
+const review = answered => ({ page: 'review', task: '4455', topic: '7222', url: 'https://www.mathacademy.com/tasks/4455/topics/7222/review',
+  step: { id: 'q987654', type: 'question', index: 0, total: 1 }, title: 'Question 1',
+  sections: { question: [[text('A pocket contains 4 quarters…')]], choices: [{ letter: 'a', content: [[text('thirty coins in all')]], picked: true }],
+    ...(answered ? { result: 'Correct', explanation: [[text('Multiply 50 by 3/5.')]] } : {}) } });
+const REVIEW_KEY = '4455-q987654';
+
+test('quizzes, diagnostics and assessments are not read at all', async t => {
+  const { capture, api } = await harness(t);
+  for (const page of ['quiz', 'diagnostic', 'assessment', 'multistep', 'other-kind']) {
+    await capture({ page, task: '9', topic: '9', step: { id: 'q1', type: 'question', index: 0, total: 1 }, title: 'secret title',
+      sections: { question: [[text('secret question')]], choices: [{ letter: 'a', content: [[text('secret choice')]], picked: true }], result: 'Correct' } });
+    const { body } = await api('/api/state');
+    assert.equal(body.current.page, page); assert.equal(body.current.key, null); assert.equal(body.record, null, page);
+    assert.ok(!JSON.stringify(body).includes('secret'), `nothing of a ${page} page is kept`);
+  }
+  assert.deepEqual(normalize({ page: 'quiz', task: '1', topic: '2', step: { id: 'q1' }, sections: { question: [[text('x')]] } }), { page: 'quiz', task: '1', topic: '2' });
+});
+
+test('a review is read like a practice question, and only ever as one', async t => {
+  const { capture, api, record } = await harness(t);
+  assert.equal((await capture(review(false))).status, 200);
+  const { body } = await api('/api/state');
+  assert.equal(body.current.page, 'review'); assert.equal(body.current.key, REVIEW_KEY);
+  assert.equal(body.record.step.type, 'question'); assert.match(body.record.sections.question[0][0].v, /pocket contains/);
+  assert.equal(voiceMode(await record()).mode, 'prereq', 'not answered yet: only the more basic knowledge');
+  // A review page that shows anything but a practice question yields no step.
+  await capture({ ...review(false), step: { id: 'e5', type: 'example', index: 0, total: 1 } });
+  const other = (await api('/api/state')).body;
+  assert.equal(other.current.page, 'review'); assert.equal(other.current.key, null); assert.equal(other.record, null);
+  await capture({ ...review(false), step: null });
+  assert.equal((await api('/api/state')).body.record, null, 'a review still loading has no step yet');
+  assert.throws(() => normalize({ page: 'review', topic: '2', step: { id: 'q1', type: 'question' }, sections: {} }), 'a review without its task is refused');
+});
+
+test('in a review the same line holds: before the answer only basic knowledge, after it the whole question', async t => {
+  const { capture, api, record, calls } = await harness(t);
+  await capture(review(false));
+  assert.equal((await api('/api/prereq', { key: REVIEW_KEY })).status, 200); await settle();
+  const list = (await record()).prereq;
+  assert.equal(list.status, 'ready'); assert.equal(list.views, 1, 'an ask made before the answer is counted, in a review too');
+  assert.match(calls.find(c => c.purpose === 'prereq').packet.题目, /pocket contains 4 quarters/);
+  assert.equal((await api('/api/prereq/expand', { key: REVIEW_KEY, item: list.items[0].id })).status, 200); await settle();
+  assert.deepEqual(Object.keys(calls.findLast(c => c.purpose === 'prereq_expand').packet).sort(), ['知识点'], 'an item opened up is shown nothing of the question');
+  assert.equal((await api('/api/chat', { key: REVIEW_KEY, text: '概率是什么意思？' })).status, 200); await settle();
+  const before = JSON.stringify(calls.findLast(c => c.purpose === 'chat').packet);
+  assert.ok(!before.includes('pocket contains') && !before.includes('thirty coins') && !before.includes('Multiply 50'), 'the tutor is shown nothing of the question');
+  await capture(review(true));
+  assert.equal(voiceMode(await record()).mode, 'answered');
+  assert.equal((await api('/api/chat', { key: REVIEW_KEY, text: '为什么乘 3/5？' })).status, 200); await settle();
+  const after = calls.findLast(c => c.purpose === 'chat').packet;
+  assert.equal(after.结果, 'Correct'); assert.match(after.官方讲解, /Multiply 50 by 3\/5/); assert.match(after.题目, /pocket contains 4 quarters/);
+  // The next question is another step, on its own.
+  await capture({ ...review(false), step: { id: 'q987655', type: 'question', index: 0, total: 1 }, sections: { question: [[text('A second review question.')]] } });
+  assert.equal((await record()).key, '4455-q987655'); assert.equal((await record()).chat, undefined);
+});
+

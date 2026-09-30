@@ -67,7 +67,7 @@ export class Board {
 
   capture(input) {
     const c = normalize(input), at = now();
-    const key = c.page === 'lesson' && c.step ? `${c.task}-${c.step.id}` : null;
+    const key = (c.page === 'lesson' || c.page === 'review') && c.step ? `${c.task}-${c.step.id}` : null;
     const before = this.current();
     let changed = !before || before.key !== key || before.page !== c.page || before.task !== c.task;
     this.store.set('current', { page: c.page, task: c.task, topic: c.topic, key, at });

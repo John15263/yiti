@@ -4,6 +4,7 @@
 import { Board } from '../server/board.js';
 import { Teach, usePrompts } from '../server/teach.js';
 import { Prereqs } from '../server/prereq.js';
+import { Simplers } from '../server/simpler.js';
 import { Chats } from '../server/chat.js';
 import { config } from '../server/config.js';
 import { Settings, testServices } from '../server/settings.js';
@@ -40,6 +41,7 @@ const publish = () => { const value = view(); for (const listener of listeners) 
 const board = new Board(store, publish);
 const teach = new Teach(board, cfg);
 const prereqs = new Prereqs(board, cfg);
+const simplers = new Simplers(board, cfg);
 const chats = new Chats(board, cfg);
 
 // Gemini Live takes its key in the address, so a plain socket reaches it; Qwen goes over WebRTC.
@@ -58,6 +60,10 @@ export async function request(path, body) {
     if (path === '/api/state') return view();
     if (path === '/api/prereq') { prereqs.start(body); return view(); }
     if (path === '/api/prereq/expand') { prereqs.expand(body); return view(); }
+    if (path === '/api/prereq/simpler') { prereqs.simpler(body); return view(); }
+    if (path === '/api/prereq/back') { prereqs.back(body); return view(); }
+    if (path === '/api/simpler') { simplers.simpler(body); return view(); }
+    if (path === '/api/simpler/back') { simplers.back(body); return view(); }
     if (path === '/api/chat') { chats.send(body); return view(); }
     if (path === '/api/chat/retry') { chats.retry(body); return view(); }
     if (path === '/api/demo') { board.capture(DEMO); return view(); }

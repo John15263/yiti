@@ -6,6 +6,7 @@ import { check, HttpError } from './validation.mjs';
 import { Board } from './board.mjs';
 import { Teach } from './teach.mjs';
 import { Prereqs } from './prereq.mjs';
+import { Simplers } from './simpler.mjs';
 import { Chats } from './chat.mjs';
 import './prompts-node.mjs';
 import { Voice } from './voice.mjs';
@@ -25,7 +26,7 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   const usage = new Usage(store); cfg = { ...cfg, usage };
   const files = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.css', ['app.css', 'text/css; charset=utf-8']],
-    ...['app.js', 'math.js', 'mode.js', 'order.js', 'tex.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js', 'demo.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
+    ...['app.js', 'ask.js', 'dock.js', 'math.js', 'mode.js', 'order.js', 'pick.js', 'size.js', 'tex.js', 'thread.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js', 'demo.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();
@@ -34,6 +35,7 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   const board = new Board(store, publish);
   const teach = new Teach(board, cfg, infer);
   const prereqs = new Prereqs(board, cfg, infer);
+  const simplers = new Simplers(board, cfg, infer);
   const chats = new Chats(board, cfg, infer);
   const voice = new Voice(board, cfg, connect);
   const sockets = new Set();
@@ -105,6 +107,10 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
         if (path === '/api/chat') { chats.send(await body(req)); return json(res, view()); }
         if (path === '/api/chat/retry') { chats.retry(await body(req)); return json(res, view()); }
         if (path === '/api/prereq/expand') { prereqs.expand(await body(req)); return json(res, view()); }
+        if (path === '/api/prereq/simpler') { prereqs.simpler(await body(req)); return json(res, view()); }
+        if (path === '/api/prereq/back') { prereqs.back(await body(req)); return json(res, view()); }
+        if (path === '/api/simpler') { simplers.simpler(await body(req)); return json(res, view()); }
+        if (path === '/api/simpler/back') { simplers.back(await body(req)); return json(res, view()); }
         // The example written for 一题 itself, followed as if it were open on Math Academy.
         if (path === '/api/demo') { await body(req); board.capture(DEMO); return json(res, view()); }
         if (path === '/api/translate') { teach.translate(await body(req)); return json(res, view()); }
@@ -132,6 +138,6 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   });
   server.requestTimeout = 20000;
   server.headersTimeout = 10000;
-  return { server, board, teach, prereqs, chats, voice, usage, token,
+  return { server, board, teach, prereqs, simplers, chats, voice, usage, token,
     closeStreams: () => { for (const res of streams) res.end(); for (const conn of sockets) conn.close(1001, 'Server stopping'); } };
 }

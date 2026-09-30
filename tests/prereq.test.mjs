@@ -221,3 +221,84 @@ test('TeX in an opened item has its backslashes put back, and a restart marks on
   assert.match(board.record(KEY).prereq.items[0].more.error, /重启/);
   void prereqs; void item;
 });
+
+// Told again more simply.
+const simple = n => ({ explain: `更简单的讲法 ${n}`, example: `更小的例子 ${n}`, pitfall: '' });
+async function opened(extra = {}) {
+  const calls = [];
+  const kit = setup(n => n === 1 ? { items: good } : n === 2 ? more : simple(n), { calls, ...extra });
+  kit.board.capture(example); kit.board.capture(question(false, ['one fifth', 'five sixths']));
+  kit.prereqs.start({ key: KEY }); await settle();
+  const item = status(kit.board).items[0];
+  kit.prereqs.expand({ key: KEY, item: item.id }); await settle();
+  return { ...kit, id: item.id, more: () => status(kit.board).items[0].more };
+}
+
+test('a simpler telling shows the model the item, the lesson and the telling so far, never the question', async () => {
+  const { board, prereqs, calls, id, more: shown } = await opened();
+  assert.equal(shown().versions.length, 1); assert.equal(shown().at, 0);
+  prereqs.simpler({ key: KEY, item: id });
+  assert.equal(shown().simplifying.status, 'running'); assert.equal(shown().explain, more.explain, 'the telling on screen stays until the new one is there');
+  await settle();
+  const { packet, opts } = calls[2];
+  assert.deepEqual(Object.keys(packet).sort(), ['知识点', '这节课在教', '现在的讲法', '已经变简单过几次'].sort());
+  assert.deepEqual(packet.现在的讲法, { 讲解: more.explain, 例子: more.example, 容易错的地方: more.pitfall });
+  assert.equal(packet.已经变简单过几次, 0);
+  assert.ok(!JSON.stringify(packet).includes('one half') && !JSON.stringify(packet).includes('one fifth'), 'nothing of the question or its choices');
+  assert.equal(opts.purpose, 'prereq_simpler');
+  assert.match(opts.instructions, /相关基础知识更少的人/); assert.match(opts.instructions, /不讲任何具体的题怎么做/);
+  assert.equal(shown().explain, '更简单的讲法 3'); assert.equal(shown().at, 1); assert.equal(shown().versions.length, 2);
+  assert.equal(shown().simplifying, undefined);
+  assert.equal(status(board).expands, 2, 'opening the item and asking for a simpler telling, both before the answer');
+  prereqs.simpler({ key: KEY, item: id }); await settle();
+  assert.equal(calls[3].packet.现在的讲法.讲解, '更简单的讲法 3', 'the next one starts from the one just read');
+  assert.equal(calls[3].packet.已经变简单过几次, 1);
+});
+
+test('the tellings can be walked back and forth without a call, and there are four at most', async () => {
+  const { prereqs, calls, id, more: shown } = await opened();
+  for (let i = 0; i < 3; i++) { prereqs.simpler({ key: KEY, item: id }); await settle(); }
+  assert.equal(shown().versions.length, 4); assert.equal(calls.length, 5);
+  assert.throws(() => prereqs.simpler({ key: KEY, item: id }), e => e.status === 409 && /最简单/.test(e.message));
+  prereqs.back({ key: KEY, item: id }); assert.equal(shown().at, 2); assert.equal(shown().explain, '更简单的讲法 4');
+  prereqs.back({ key: KEY, item: id }); prereqs.back({ key: KEY, item: id });
+  assert.equal(shown().at, 0); assert.equal(shown().explain, more.explain); assert.equal(shown().pitfall, more.pitfall);
+  assert.throws(() => prereqs.back({ key: KEY, item: id }), e => e.status === 409);
+  prereqs.simpler({ key: KEY, item: id }); assert.equal(shown().at, 1); assert.equal(shown().explain, '更简单的讲法 3');
+  assert.equal(calls.length, 5, 'tellings already made are shown again, not made again');
+  assert.equal(shown().limit, 4);
+});
+
+test('a simpler telling needs an opened item, keeps what is on screen when it fails, and can be asked for again', async () => {
+  const calls = [];
+  const kit = setup(n => n === 1 ? { items: good } : n === 2 ? more : n === 3 ? new Error('Gemini HTTP 429') : simple(n), { calls });
+  kit.board.capture(question(false)); kit.prereqs.start({ key: KEY }); await settle();
+  const id = status(kit.board).items[0].id, shown = () => status(kit.board).items[0].more;
+  assert.throws(() => kit.prereqs.simpler({ key: KEY, item: id }), e => e.status === 409, 'not opened yet');
+  assert.throws(() => kit.prereqs.back({ key: KEY, item: id }), e => e.status === 409);
+  assert.throws(() => kit.prereqs.simpler({ key: KEY, item: 'not-in-the-list' }), e => e.status === 409);
+  assert.throws(() => kit.prereqs.simpler({ key: KEY, item: id, extra: 1 }));
+  kit.prereqs.expand({ key: KEY, item: id }); await settle();
+  kit.prereqs.simpler({ key: KEY, item: id }); await settle();
+  assert.equal(shown().simplifying.status, 'error'); assert.match(shown().simplifying.error, /Gemini/);
+  assert.equal(shown().status, 'ready'); assert.equal(shown().explain, more.explain); assert.equal(shown().versions.length, 1);
+  kit.prereqs.simpler({ key: KEY, item: id }); await settle();
+  assert.equal(shown().simplifying, undefined); assert.equal(shown().explain, '更简单的讲法 4');
+});
+
+test('an item opened before tellings were kept can still be told more simply, and a restart marks one being made', async () => {
+  const { store, board, prereqs, id, more: shown } = await opened();
+  const rec = board.record(KEY); delete rec.prereq.items[0].more.versions; delete rec.prereq.items[0].more.at; store.putStep(rec);
+  prereqs.simpler({ key: KEY, item: id }); await settle();
+  assert.equal(shown().versions.length, 2); assert.equal(shown().versions[0].explain, more.explain);
+  const slow = setup(n => n === 1 ? { items: good } : more);
+  slow.board.capture(question(false)); slow.prereqs.start({ key: KEY }); await settle();
+  const slowId = status(slow.board).items[0].id;
+  slow.prereqs.expand({ key: KEY, item: slowId }); await settle();
+  slow.prereqs.infer = () => new Promise(() => {});   // a reply that never comes
+  slow.prereqs.simpler({ key: KEY, item: slowId }); await settle();
+  assert.equal(status(slow.board).items[0].more.simplifying.status, 'running');
+  new Prereqs(slow.board, { geminiKey: 'k' }, async () => { throw new Error('unused'); });
+  const marked = status(slow.board).items[0].more.simplifying;
+  assert.equal(marked.status, 'error'); assert.match(marked.error, /重启/);
+});

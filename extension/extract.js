@@ -1,6 +1,6 @@
 // 一题 · runs inside Math Academy's own page (the MAIN world) so it can ask MathJax for each formula's TeX.
 // It reads only the step Math Academy is on now: later steps are already in the page, and stay unread.
-// Quizzes, reviews and anything that is not a lesson send nothing but their kind.
+// Quizzes, diagnostics and anything that is not a lesson or a review send nothing but their kind.
 (() => {
   if (window.__yiti) return;
   const BLOCK = new Set(['P', 'DIV', 'LI', 'UL', 'OL', 'TABLE', 'TBODY', 'TR', 'TD', 'H1', 'H2', 'H3', 'H4', 'CENTER', 'BLOCKQUOTE']);
@@ -57,10 +57,67 @@
   }
   const words = el => el?.innerText.replace(/\s+/g, ' ').trim() || '';
 
+  // A practice question as Math Academy draws it, in a lesson or in a review.
+  function questionOf(el) {
+    const verdict = words(el.querySelector('.questionWidget-result'));
+    const circle = row => row.querySelector('.questionWidget-choiceLetterCircle');
+    return { title: words(el.querySelector('.questionWidget-title')), sections: {
+      question: paragraphs(el.querySelector('.questionWidget-text')),
+      choices: [...el.querySelectorAll('.questionWidget-choicesTable tr')].map(row => ({ letter: words(circle(row)), content: paragraphs(row.querySelector('.questionWidget-choiceText')), picked: !!circle(row)?.getAttribute('style') })),
+      answer: [...el.querySelectorAll('input[type="text"], input:not([type]), textarea')].map(i => i.value).filter(Boolean).join(' ; '),
+      // The explanation is only read once the answer is in.
+      ...(verdict ? { result: verdict, explanation: paragraphs(el.querySelector('.questionWidget-explanation')) } : {}),
+    } };
+  }
+  // A review is a run of practice questions, and the step is the one being looked at, wherever the page keeps the others
+  // (below, above, off to the side: the earlier ones may still be there). Its id is made from its own words, so it stays
+  // the same however often the page is read, and is another when another question comes to the screen.
+  const widgetOf = t => t.closest('[id^="step-"]') || t.closest('.questionWidget') || t.parentElement?.parentElement || document.body;
+  // Where a question is on the screen: its own box when there is one box per question, else just its words.
+  const boxOf = t => { const w = widgetOf(t); return (w.querySelectorAll('.questionWidget-text').length === 1 ? w : t).getBoundingClientRect(); };
+  const shown = box => Math.max(0, Math.min(box.bottom, innerHeight) - Math.max(box.top, 0)) * Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0));
+  const away = box => Math.abs((box.top + box.bottom) / 2 - innerHeight / 2) + Math.abs((box.left + box.right) / 2 - innerWidth / 2);
+  // The one most on screen; when none is (its words scrolled past while its answer box is in view), the one nearest the middle.
+  function looked(texts) {
+    let best = null, bestShown = -1, bestAway = Infinity;
+    for (const t of texts) {
+      const box = boxOf(t), seen = shown(box), off = away(box);
+      if (seen > bestShown || (seen === bestShown && off < bestAway)) { best = t; bestShown = seen; bestAway = off; }
+    }
+    return best;
+  }
+  function readReview(task, topic) {
+    const base = { page: 'review', task, topic };
+    const texts = [...document.querySelectorAll('.questionWidget-text')].filter(e => e.checkVisibility?.() !== false);
+    const text = looked(texts);
+    const asked = text && JSON.stringify(paragraphs(text));
+    if (!text || asked === '[]') return { ...base, step: null };
+    let h = 2166136261;
+    for (const c of asked) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619); }
+    return { ...base, url: location.href, step: { id: `q${h >>> 0}`, type: 'question', index: 0, total: 1 }, ...questionOf(widgetOf(text)) };
+  }
+  // For finding out how a page is built when it is not read as expected: names and counts only, never a word of its text.
+  function outline() {
+    const count = sel => document.querySelectorAll(sel).length;
+    const name = e => `${e.localName}${e.id ? '#' + e.id.replace(/\d+/g, 'N') : ''}${[...e.classList].slice(0, 3).map(c => '.' + c).join('')}`;
+    const anchor = document.querySelector('.questionWidget-text') || document.querySelector('[class*="question" i]') || document.body;
+    const chain = [];
+    for (let e = anchor; e && e !== document.documentElement && chain.length < 7; e = e.parentElement) chain.unshift(name(e));
+    const tree = (e, depth) => depth > 3 ? [] : [...e.children].slice(0, 12).flatMap(c => [`${'  '.repeat(depth)}${name(c)}${c.children.length ? ` (${c.children.length})` : ''}`, ...tree(c, depth + 1)]);
+    const root = anchor.closest('[id^="step-"], .questionWidget') || anchor.parentElement || document.body;
+    return JSON.stringify({ path: location.pathname.replace(/\d+/g, 'N'),
+      found: Object.fromEntries(Object.entries({ progressButtons: '#progressBar .stepButton', steps: '[id^="step-"]', widgets: '.questionWidget', questionText: '.questionWidget-text',
+        choiceRows: '.questionWidget-choicesTable tr', result: '.questionWidget-result', explanation: '.questionWidget-explanation', inputs: 'input[type="text"], textarea' }).map(([k, sel]) => [k, count(sel)])),
+      questions: [...document.querySelectorAll('.questionWidget-text')].map(t => { const box = boxOf(t); return { visible: t.checkVisibility?.() !== false, top: Math.round(box.top), left: Math.round(box.left), height: Math.round(box.height), onScreen: Math.round(shown(box)), answered: !!words(widgetOf(t).querySelector('.questionWidget-result')) }; }),
+      chain, tree: tree(root, 0) }, null, 1);
+  }
+
   function read() {
     const m = location.pathname.match(/^\/tasks\/(\d+)\/topics\/(\d+)\/([a-z-]+)/i);
     if (!m) return { page: 'other' };
     const [, task, topic, kind] = m, page = kind.toLowerCase();
+    // Quizzes, diagnostics and assessments measure what can be done alone: nothing of them is read. A review is read like a practice question.
+    if (page === 'review') return readReview(task, topic);
     if (page !== 'lesson') return { page, task, topic };
     const buttons = [...document.querySelectorAll('#progressBar .stepButton')];
     const button = buttons.find(b => b.classList.contains('current'));
@@ -69,18 +126,7 @@
     if (!el) return { page, task, topic, step: null };
     const step = { id, type: TYPES[id[0]] || 'other', index: buttons.indexOf(button), total: buttons.length };
     const base = { page, task, topic, url: location.href, step };
-    if (step.type === 'question') {
-      const verdict = words(el.querySelector('.questionWidget-result'));
-      const circle = row => row.querySelector('.questionWidget-choiceLetterCircle');
-      return { ...base, title: words(el.querySelector('.questionWidget-title')), sections: {
-        question: paragraphs(el.querySelector('.questionWidget-text')),
-        choices: [...el.querySelectorAll('.questionWidget-choicesTable tr')].map(row => ({ letter: words(circle(row)),
-          content: paragraphs(row.querySelector('.questionWidget-choiceText')), picked: !!circle(row)?.getAttribute('style') })),
-        answer: [...el.querySelectorAll('input[type="text"], input:not([type]), textarea')].map(i => i.value).filter(Boolean).join(' ; '),
-        // The explanation is only read once the answer is in.
-        ...(verdict ? { result: verdict, explanation: paragraphs(el.querySelector('.questionWidget-explanation')) } : {}),
-      } };
-    }
+    if (step.type === 'question') return { ...base, ...questionOf(el) };
     const title = words(el.querySelector('.stepName'));
     if (step.type === 'example') return { ...base, title, sections: {
       question: paragraphs(el.querySelector('.exampleQuestion')), explanation: paragraphs(el.querySelector('.exampleExplanation')) } };
@@ -99,8 +145,10 @@
     window.postMessage({ source: 'yiti-extract', payload }, location.origin);
   }
   const soon = () => { if (!timer) timer = setTimeout(send, 700); };
-  window.__yiti = { read, send: () => { last = ''; send(); } };
-  new MutationObserver(soon).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
+  window.__yiti = { read, outline, send: () => { last = ''; send(); } };
+  new MutationObserver(soon).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'style'] });
+  // Moving back and forth through a review is scrolling (or sliding), not a change of the page's words.
+  addEventListener('scroll', soon, { capture: true, passive: true }); addEventListener('resize', soon);
   // Coming back to this tab makes it the one being followed again.
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { last = ''; soon(); } });
   addEventListener('popstate', soon);

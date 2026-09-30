@@ -6,16 +6,20 @@
   <link rel="stylesheet" href="app.css"><script type="module" src="app.js"></script>
 </head>
 <body>
-  <!-- 一行顶栏：在哪一步，和两个随手的开关（中英、语音）。 -->
+  <!-- 一行顶栏：在哪一步，和随手的开关（中英）。语音在下面的问一问里。 -->
   <header>
     <a href="/" class="brand"><span class="dot" aria-hidden="true"></span>一题</a>
     <span id="where"></span>
     <span id="connection" role="status" hidden></span>
     <button id="update-note" class="chip warn" hidden title="本地服务换了新代码，这个页面还是旧的">有更新 · 刷新</button>
+    <span id="fs"><button id="fs-down" aria-label="字小一点">A−</button><button id="fs-up" aria-label="字大一点">A+</button></span>
     <button id="lang" class="chip" hidden title="中文 / 英文原文"></button>
-    <button id="voice-open" class="chip" hidden></button>
     <button id="settings-open" class="chip" title="API key 和用哪家服务">设置</button>
   </header>
+  <p id="error" role="alert" hidden></p>
+  <!-- 窄的时候（侧边栏）：上面是这一步，下面是问一问；宽的时候：左右两栏。 -->
+  <div id="app">
+  <div id="stage">
   <main>
     <section id="waiting" hidden>
       <h1>打开 Math Academy 的一节课，这里会跟到你正在看的那一步。</h1>
@@ -32,50 +36,62 @@
       <p id="elsewhere-note" class="muted"></p>
     </section>
 
-    <!-- 一步：内容在上（中文），然后是前置知识，最下面是问一问。讲解、例题、练习题都是这一套。 -->
+    <!-- 一步：内容在上（中文），然后是前置知识。问一问在页面下面（宽屏在右边）。讲解、例题、练习题都是这一套。 -->
     <section id="step" hidden>
       <p id="step-title" class="eyebrow"></p>
       <button id="status-line" class="status-line" hidden></button>
-      <div id="context" class="mathtext"></div>
-      <ol id="choices" class="choices" hidden></ol>
+      <div id="context" class="mathtext" data-ask="question"></div>
+      <ol id="choices" class="choices" data-ask="choices" hidden></ol>
 
       <!-- 讲解和例题：整段原文，翻成中文，不分块、不遮住、不默写。 -->
-      <div id="content" class="original mathtext" hidden></div>
+      <div id="content" class="original mathtext" data-ask="content" hidden></div>
 
       <p id="ask" class="meaning" hidden>先在 Math Academy 做完、交答案，答错也没关系。<span class="muted">卡在基础上，看下面的前置知识，或者问一问。</span></p>
 
       <!-- 练习题交了答案之后：对错和官方讲解。 -->
-      <div id="answer" hidden>
+      <div id="answer" data-ask="answer" hidden>
         <p class="verdict-line"><b id="answer-result"></b><button id="answer-explain" class="link"></button><span id="answer-prior" class="muted"></span></p>
         <div id="answer-explanation" class="original mathtext" hidden></div>
       </div>
 
+      <!-- 更简单的解释：讲解、例题，或者交了答案之后的官方讲解，讲给基础更少的人听；可以再来一次。交答案之前的题没有。 -->
+      <div id="simpler" data-ask="simpler" hidden>
+        <p id="simpler-bar"></p>
+        <div id="simpler-box" class="mathtext" hidden></div>
+      </div>
+
       <div class="tools"><button id="prereq-toggle">前置知识</button></div>
-      <div id="prereq" hidden>
+      <div id="prereq" data-ask="prereq" hidden>
         <p class="verdict-line"><b id="prereq-title"></b></p>
         <p id="prereq-status" class="muted"></p>
         <div id="prereq-list"></div>
         <p id="prereq-note" class="muted"></p>
       </div>
 
-      <!-- 问一问：随时可以问，多轮，不打分。交答案之前只能问基础知识（模型看不到题目）。 -->
-      <div id="chat">
-        <p class="verdict-line"><b>有疑问？问一问</b><span id="chat-about" class="muted"></span></p>
-        <div id="chat-thread"></div>
-        <textarea id="chat-text" rows="3" spellcheck="true" autocomplete="off"></textarea>
-        <div class="chat-actions"><button id="chat-send">发送  ⌘↵</button><span id="chat-status" class="muted"></span></div>
-      </div>
-      <p id="error" role="alert" hidden></p>
-    </section>
-
-    <!-- 语音：只放这一次的对话；之前的收起来。 -->
-    <section id="voice" hidden>
-      <p id="voice-status" class="muted" hidden></p>
-      <div id="voice-transcript" class="transcript" hidden></div>
-      <details id="voice-earlier" hidden><summary id="voice-earlier-title"></summary><div id="voice-earlier-list" class="transcript"></div></details>
     </section>
 
   </main>
+  </div>
+
+  <!-- 问一问：一直停在下面（宽屏在右边），随时可以问，不打分。文字和语音是同一条对话。
+       交答案之前只能问基础知识（模型看不到题目）。 -->
+  <aside id="dock" hidden aria-label="问一问">
+    <div id="dock-grip" role="separator" tabindex="0"></div>
+    <div class="dock-head">
+      <b>问一问</b><span id="chat-scope" class="muted"></span>
+      <span id="voice-status" class="muted" hidden></span>
+      <button id="voice-open" class="chip" hidden></button>
+      <button id="dock-fold" class="chip" aria-expanded="true">收起</button>
+    </div>
+    <div id="chat-thread" data-ask="chat"></div>
+    <p id="chat-status" class="muted"></p>
+    <div id="chat-ideas" hidden></div>
+    <div class="dock-input">
+      <textarea id="chat-text" rows="1" spellcheck="true" autocomplete="off"></textarea>
+      <button id="chat-send" class="primary">发送 ⌘↵</button>
+    </div>
+  </aside>
+  </div>
 
   <!-- 设置：用哪家服务、填 key。key 存在本机，只显示末尾四位。 -->
   <dialog id="settings">

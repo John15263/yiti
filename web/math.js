@@ -55,7 +55,12 @@ export function formula(part) {
   if (mml) {
     const parsed = new DOMParser().parseFromString(mml, 'text/html').body.firstElementChild;
     const math = parsed && rebuild(parsed);
-    if (math) { if (part.display) math.setAttribute('display', 'block'); return math; }
+    if (math) {
+      if (part.display) math.setAttribute('display', 'block');
+      // What was written, kept beside what is drawn, so words selected across a formula can be quoted as the formula.
+      if (part.tex) math.setAttribute('data-tex', part.tex);
+      return math;
+    }
   }
   const code = document.createElement('code');
   code.className = 'tex'; code.textContent = part.tex;

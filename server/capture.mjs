@@ -8,7 +8,8 @@ import { check } from './validation.mjs';
 //   { page: 'lesson', task, topic, url, step: { id, type, index, total }, title,
 //     sections: { body | question | explanation: Paragraphs, choices: [{ letter, content, picked }], result, answer } }
 //
-// Pages other than a lesson (quiz, review, diagnostic…) arrive as { page, task?, topic? } with no content.
+// A review page arrives like a lesson step, and only ever as a practice question. Other pages (quiz, diagnostic…)
+// arrive as { page, task?, topic? } with no content.
 
 const TYPES = { t: 'tutorial', e: 'example', q: 'question' };
 const MAX_PARAS = 80, MAX_PARTS = 80, MAX_TEXT = 4000, MAX_TEX = 2000, MAX_MML = 30000;
@@ -35,13 +36,15 @@ export function normalize(input) {
   const page = typeof input.page === 'string' && /^[a-z-]{1,30}$/.test(input.page) ? input.page : 'other';
   const digits = v => typeof v === 'string' && /^\d{1,20}$/.test(v) ? v : null;
   const task = digits(input.task), topic = digits(input.topic);
-  if (page !== 'lesson') return { page, task, topic };
+  if (page !== 'lesson' && page !== 'review') return { page, task, topic };
   check(task, 'Invalid task');
   const s = input.step;
   if (!s) return { page, task, topic, step: null };
   check(typeof s.id === 'string' && /^[a-z]\d{1,12}$/.test(s.id), 'Invalid step');
   const step = { id: s.id, type: TYPES[s.id[0]] || 'other',
     index: Number.isInteger(s.index) && s.index >= 0 ? s.index : 0, total: Number.isInteger(s.total) && s.total > 0 ? s.total : 0 };
+  // A review is a run of practice questions, and nothing else is taken from it.
+  if (page === 'review' && step.type !== 'question') return { page, task, topic, step: null };
   const sec = input.sections && typeof input.sections === 'object' ? input.sections : {};
   const sections = {};
   for (const name of ['body', 'question', 'explanation']) if (sec[name]) sections[name] = paragraphs(sec[name]);

@@ -1,12 +1,13 @@
 import { voiceMode } from './mode.js';
 import { openVoice, microphoneDenied } from './backend.js';
 // Live voice tutor: the page carries the microphone, never the API key; the local server owns the prompt
-// and records what was said. The audio side is 一句's, unchanged.
+// and records what was said. The audio side is 一句's, unchanged. What was said is not drawn here: the page puts it in
+// the one conversation with what was typed (thread.js), taking the lines of a call still going from pending().
 const OUTPUT_RATE = 24000;
 const KINDS = { learn: '讲解', answered: '讲这道题', prereq: '前置知识（交答案前）' };
 // What the voice button in the top bar does at this moment, said on hover; its face only says 语音 ⌘].
 const LABELS = { learn: '让陪练讲这一步', answered: '让陪练讲这道题', prereq: '问前置知识：不讲这道题的做法' };
-const headingOf = mode => KINDS[mode] || '陪练';
+export const headingOf = mode => KINDS[mode] || '陪练';
 
 function toBase64(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -22,13 +23,11 @@ function fromBase64(value) {
 // null: a service whose price is not known here; its usage is kept in tokens, never guessed.
 const money = value => value === null ? '费用见服务商控制台' : !value ? '$0' : value < 0.001 ? '< $0.001' : `$${value.toFixed(3)}`;
 
-export function createVoice({ getRecord, available = () => true }) {
+export function createVoice({ getRecord, available = () => true, onChange = () => {} }) {
   const $ = id => document.getElementById(id);
   let socket = null, capture = null, stream = null, playback = null, playHead = 0, sources = new Set();
   let live = false, status = '', startedAt = 0, ticker = null, lines = [], usd = 0;
-  let modeKey = '', heading = '', sessionID = '', generation = 0, ended = null, shownKey;
-  // Conversations opened from this page about the moment on screen stay open to read; everything else is folded away.
-  let mine = new Set();
+  let modeKey = '', callKey = '', sessionID = '', generation = 0, ended = null, shownKey;
 
   function elapsed() {
     const seconds = Math.round((Date.now() - startedAt) / 1000);
@@ -43,28 +42,8 @@ export function createVoice({ getRecord, available = () => true }) {
     $('voice-open').title = live ? '结束语音（⌘ ]）' : `${LABELS[m?.mode] || '语音陪练'}（⌘ ]）`;
     $('voice-open').classList.toggle('live', live);
     const line = live ? [!sessionID ? '正在连接…' : sources.size ? '陪练在讲' : '在听，你可以提问', usd === undefined ? '' : money(usd)].filter(Boolean).join(' · ') : status;
-    $('voice-status').textContent = line; $('voice-status').hidden = !line;
-    const past = (rec?.voice || []);
-    if (ended && past.some(v => v.session_id === ended.id)) ended = null;
-    const blocks = past.map(v => ({ id: v.session_id, heading: headingOf(v.mode), lines: v.transcript }));
-    if (ended) blocks.push({ id: ended.id, heading: ended.heading, lines: ended.lines });
-    if (live) blocks.push({ id: sessionID, heading, lines });
-    const here = blocks.filter(b => b.lines.length && (mine.has(b.id) || (live && b.id === sessionID)));
-    const earlier = blocks.filter(b => b.lines.length && !here.includes(b));
-    const list = $('voice-transcript'), following = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
-    fill(list, here, here.length > 1); list.hidden = !here.length;
-    $('voice-earlier').hidden = !earlier.length;
-    $('voice-earlier-title').textContent = `之前的语音对话 · ${earlier.length} 段`;
-    fill($('voice-earlier-list'), earlier, true);
-    $('voice').hidden = !line && !here.length && !earlier.length;
-    if (following) list.scrollTop = list.scrollHeight;
-  }
-  function fill(list, blocks, headings) {
-    list.replaceChildren();
-    for (const b of blocks) {
-      if (headings) { const h = document.createElement('p'); h.className = 'session'; h.textContent = b.heading; list.append(h); }
-      for (const line of b.lines) { const p = document.createElement('p'); p.className = line.role === 'tutor' ? 'tutor' : 'user'; p.textContent = line.text; list.append(p); }
-    }
+    $('voice-status').textContent = line; $('voice-status').title = line; $('voice-status').hidden = !line;
+    onChange();
   }
   function note(role, text) {
     const last = lines.at(-1);
@@ -119,12 +98,12 @@ export function createVoice({ getRecord, available = () => true }) {
     const run = ++generation;
     // Cost is shown once the service has reported some; before that there is nothing to show.
     live = true; lines = []; usd = undefined; startedAt = Date.now(); sessionID = '';
-    modeKey = m.key; heading = headingOf(m.mode); status = ''; paint();
+    modeKey = m.key; callKey = rec.key; status = ''; paint();
     // Each call answers only for itself: an old one still closing must never end the call that replaced it.
     let call = null;
     const message = value => {
       if (socket !== call) return;
-      if (value.voice === 'ready') { startedAt = Date.now(); sessionID = value.session || 'ready'; mine.add(sessionID); paint(); return; }
+      if (value.voice === 'ready') { startedAt = Date.now(); sessionID = value.session || 'ready'; paint(); return; }
       if (value.voice === 'error') { status = value.message; paint(); return; }
       if (value.voice === 'usage') { usd = value.usd; paint(); return; }
       if (value.voice === 'closed') { status = value.reason; stop(false); return; }
@@ -158,7 +137,7 @@ export function createVoice({ getRecord, available = () => true }) {
     if (live && sessionID) status = `${status || '语音已结束。'} 用时 ${elapsed()}${usd === undefined ? '' : usd === null ? ` · ${money(usd)}` : ` · 实际花费 ${money(usd)}`}`;
     live = false;
     // What was just said stays on screen until the recorded copy of it arrives.
-    if (sessionID && lines.length) ended = { id: sessionID, key: modeKey, heading, lines };
+    if (sessionID && lines.length) ended = { id: sessionID, recKey: callKey, mode: modeKey.split(':')[0], startedAt, lines };
     lines = []; sessionID = '';
     clearInterval(ticker); ticker = null;
     const call = socket; socket = null;
@@ -174,8 +153,15 @@ export function createVoice({ getRecord, available = () => true }) {
     update() {
       const m = voiceMode(getRecord());
       if (live && m?.key !== modeKey) { status = m ? '到了下一段，语音结束。按 ⌘ ] 可以接着问。' : '这一步不开语音，语音结束。'; stop(); }
-      if (m?.key !== shownKey) { if (!live && shownKey !== undefined) status = ''; if (!live) mine = new Set(); shownKey = m?.key; }
+      if (m?.key !== shownKey) { if (!live && shownKey !== undefined) status = ''; shownKey = m?.key; }
       paint();
+    },
+    // The calls of the step on screen that the record does not hold yet: the one on the air, and the one just ended.
+    pending() {
+      const rec = getRecord();
+      if (ended && (rec?.voice || []).some(v => v.session_id === ended.id)) ended = null;
+      const now = live && sessionID && lines.length && callKey === rec?.key ? { id: sessionID, mode: modeKey.split(':')[0], startedAt, lines } : null;
+      return [ended?.recKey === rec?.key ? ended : null, now].filter(Boolean);
     },
   };
 }
