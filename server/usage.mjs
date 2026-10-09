@@ -15,7 +15,7 @@ const PRICES = [
   { prefix: 'gemini-3.5-flash-lite', text_in: 0.30, text_out: 2.50, audio_in: 0.30 },
 ];
 export const PURPOSES = {
-  prepare: '例题拆块', translate: '翻译', check: '默写检查', say: '一句点评', variant_make: '变式出题', variant_check: '变式检查', voice_learn: '语音讲解', voice_check: '检查讲解', voice_say: '点评讲解', voice_write: '语音陪练（默写）', voice_prereq: '前置知识（交答案前）', voice_answered: '语音讲解（交答案后）', prereq: '前置知识清单（交答案前）', prereq_expand: '前置知识展开（交答案前）', prereq_simpler: '前置知识更简单的解释（交答案前）', simpler_step: '更简单的解释（讲解、例题）', simpler_answered: '更简单的解释（交答案后）', chat: '追问对话（交答案后）',
+  prepare: '例题拆块', translate: '翻译', check: '默写检查', say: '一句点评', variant_make: '变式出题', variant_check: '变式检查', voice_learn: '语音讲解', voice_check: '检查讲解', voice_say: '点评讲解', voice_write: '语音陪练（默写）', voice_prereq: '前置知识（交答案前）', voice_answered: '语音讲解（交答案后）', prereq: '前置知识清单（交答案前）', prereq_expand: '前置知识展开（交答案前）', prereq_simpler: '前置知识更简单的解释（交答案前）', simpler_step: '更简单的解释（讲解、例题）', simpler_answered: '更简单的解释（交答案后）', chat: '追问对话（交答案后）', place: '这节课的定位', official_zh: '官方前置知识点的中文名', later: '学这个有什么用', later_expand: '学这个有什么用（展开）', later_uses: '那一层有什么用', later_simpler: '学这个有什么用（更简单的解释）',
 };
 
 const count = value => Number.isInteger(value) && value > 0 ? value : 0;

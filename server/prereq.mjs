@@ -3,6 +3,9 @@ import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
 import { parasText } from './capture.mjs';
 import { prompt, cut } from './teach.mjs';
 import { lessonTitles } from './board.mjs';
+import { placeText } from './place.mjs';
+import { officialNames } from './official.mjs';
+import { simplerTelling, earlierTelling, staleTelling } from './retell.mjs';
 import { isContent, isQuestion, unanswered, learnParas } from '../web/mode.js';
 
 // 前置知识: the more basic concepts, methods and formulas a step rests on, listed for the learner to read, and each
@@ -28,8 +31,11 @@ export const EXPAND_SCHEMA = { type: 'object', additionalProperties: false, requ
 const KIND_NAMES = { concept: '基础概念', method: '基础方法', formula: '基础公式' };
 // The tellings of an item so far, oldest first (one, for an item opened before there were more).
 const versionsOf = more => more.versions || [{ explain: more.explain, example: more.example, pitfall: more.pitfall }];
+// The telling on screen is also kept on the item itself, where the page and the conversation read it.
+const showTelling = more => Object.assign(more, more.versions[more.at]);
 export function moreOf(value) {
-  const more = { explain: cut(value?.explain, 700), example: cut(value?.example, 500), pitfall: cut(value?.pitfall, 400) };
+  // The limits only guard against a runaway reply: formulas count here, and a matrix's TeX alone can be hundreds of characters.
+  const more = { explain: cut(value?.explain, 2000), example: cut(value?.example, 2000), pitfall: cut(value?.pitfall, 800) };
   return more.explain ? more : null;
 }
 
@@ -41,7 +47,7 @@ const hasContent = rec => isQuestion(rec) ? !!rec.sections.question?.length : is
 // yet in what is kept here), and what the lesson teaches. A tutorial or example: its own text, and the lesson's
 // other steps.
 export function prereqPacket(rec, lesson) {
-  if (isQuestion(rec)) return { 这一步: rec.title || '', ...(lesson.length ? { 这节课在教: lesson } : {}), 题目: parasText(rec.sections.question), ...(choicesOf(rec).length ? { 选项: choicesOf(rec) } : {}) };
+  if (isQuestion(rec)) return { 这一步: rec.title || '', ...(rec.page === 'review' ? { 复习题: true } : {}), ...(lesson.length ? { 这节课在教: lesson } : {}), 题目: parasText(rec.sections.question), ...(choicesOf(rec).length ? { 选项: choicesOf(rec) } : {}) };
   const others = lesson.filter(t => t !== rec.title);
   return { 这一步: rec.title || '', 类型: rec.step.type === 'example' ? '例题' : '讲解',
     ...(rec.step.type === 'example' ? { 题目: parasText(rec.sections.question) } : {}), 内容: parasText(learnParas(rec)), ...(others.length ? { 这节课的其他步骤: others } : {}) };
@@ -62,15 +68,15 @@ export function itemsOf(raw, rec) {
 }
 
 export class Prereqs {
-  constructor(board, cfg, infer = (packet, opts) => textJSON(packet, cfg, opts)) {
-    this.board = board; this.cfg = cfg; this.infer = infer;
+  constructor(board, cfg, infer = (packet, opts) => textJSON(packet, cfg, opts), places = null) {
+    this.board = board; this.cfg = cfg; this.infer = infer; this.places = places;
     // A call cut off by a restart is never replayed; it is marked so it can be tried again.
     for (const rec of board.store.steps()) {
       let touched = false;
       if (rec.prereq?.status === 'running') { rec.prereq = { ...rec.prereq, status: 'error', error: '服务重启，整理前置知识中断了，可以重试。' }; touched = true; }
       for (const item of rec.prereq?.items || []) {
         if (item.more?.status === 'running') { item.more = { ...item.more, status: 'error', error: '服务重启，展开中断了，可以重试。' }; touched = true; }
-        if (item.more?.simplifying?.status === 'running') { item.more = { ...item.more, simplifying: { status: 'error', error: '服务重启，重新讲解中断了，可以重试。' } }; touched = true; }
+        if (staleTelling(item.more, null, '服务重启，重新讲解中断了，可以重试。')) touched = true;
       }
       if (touched) board.store.putStep(rec);
     }
@@ -87,8 +93,11 @@ export class Prereqs {
     const started = crypto.randomUUID();
     rec.prereq = { ...(rec.prereq || {}), status: 'running', id: started, views, started_at: now(), items: undefined, error: undefined };
     this.board.save(rec);
-    const packet = prereqPacket(rec, lessonTitles(this.board.store, rec));
     Promise.resolve().then(async () => {
+      // The lesson's place comes first (made from its titles only, never the question), so the list fits its stage.
+      const place = await this.places?.ensure(rec);
+      const official = officialNames(this.board.store, rec);
+      const packet = { ...prereqPacket(rec, lessonTitles(this.board.store, rec)), ...(place ? { 这节课的定位: placeText(place) } : {}), ...(official.length ? { 'Math Academy 官方前置': official } : {}) };
       const { value, model } = await this.infer(packet, { instructions: prompt(isQuestion(rec) ? 'prereq' : 'prereq-step'), schema: PREREQ_SCHEMA, purpose: 'prereq', key: rec.key, tokens: 4096, limit: 8000 });
       check(value && typeof value === 'object', 'Invalid model response');
       const items = itemsOf(value.items, rec);
@@ -132,56 +141,45 @@ export class Prereqs {
     }).catch(error => settle({ status: 'error', error: textError(error, this.cfg) }));
     return rec;
   }
-  // An item opened up, told again for someone who knows less. The model is shown what it is shown for opening the item
-  // (the item and what the lesson teaches, never the step's text or question) and the telling so far; so on a question
-  // not yet answered it still knows nothing of the question. Tellings already made are walked through again without a
-  // new call. Asked before the answer, it is counted like opening an item.
+  // An item opened up, told again for someone who knows less (retell.mjs). The model is shown what it is shown for opening
+  // the item (the item and what the lesson teaches, never the step's text or question) and the telling so far; so on a
+  // question not yet answered it still knows nothing of the question. Asked before the answer, it is counted like opening
+  // an item.
   simpler(body) {
     const { rec, item } = this.open(body);
-    const more = item.more, versions = versionsOf(more), at = more.at ?? 0;
-    check(more?.status === 'ready', '先把这一项展开。', 409);
-    if (unanswered(rec)) rec.prereq.expands = (rec.prereq.expands || 0) + 1;
-    if (at < versions.length - 1) { item.more = { ...more, ...versions[at + 1], versions, at: at + 1 }; return this.board.save(rec); }
-    if (more.simplifying?.status === 'running') return this.board.save(rec);
-    check(versions.length < MAX_VERSIONS, '已经是最简单的一版了。还不明白的话，问问陪练。', 409);
-    check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
-    const started = crypto.randomUUID(), lesson = lessonTitles(this.board.store, rec), current = versions.at(-1);
-    item.more = { ...more, versions, at, simplifying: { status: 'running', id: started } };
-    this.board.save(rec);
-    const packet = { 知识点: { 类别: KIND_NAMES[item.kind], 名称: item.name, 说明: item.note }, ...(lesson.length ? { 这节课在教: lesson } : {}),
-      现在的讲法: { 讲解: current.explain, 例子: current.example, 容易错的地方: current.pitfall || '' }, 已经变简单过几次: versions.length - 1 };
-    const settle = change => {
-      const latest = this.board.record(rec.key), held = latest?.prereq?.items?.find(i => i.id === item.id);
-      if (held?.more?.simplifying?.id !== started) return;
-      held.more = { ...held.more, ...change };
-      this.board.save(latest);
-    };
-    Promise.resolve().then(async () => {
-      const { value, model } = await this.infer(packet, { instructions: prompt('prereq-simpler'), schema: EXPAND_SCHEMA, purpose: 'prereq_simpler', key: rec.key, tokens: 4096, limit: 8000 });
-      const next = moreOf(value);
-      check(next, 'Invalid model response');
-      const latest = this.board.record(rec.key), held = latest?.prereq?.items?.find(i => i.id === item.id);
-      if (held?.more?.simplifying?.id !== started) return;
-      // The new telling is shown at once unless the learner has gone back to an earlier one meanwhile.
-      const shown = (held.more.at ?? 0) === versions.length - 1;
-      held.more = { ...held.more, ...(shown ? next : {}), versions: [...versions, next], at: shown ? versions.length : held.more.at, model, simplifying: undefined };
-      this.board.save(latest);
-    }).catch(error => settle({ simplifying: { status: 'error', error: textError(error, this.cfg) } }));
-    return rec;
+    const lesson = lessonTitles(this.board.store, rec), counted = unanswered(rec);
+    simplerTelling({ access: this.tellings(rec.key, item.id), cfg: this.cfg, boot: this.board.boot, show: showTelling,
+      before: () => { if (counted) this.count = true; },
+      call: (current, count) => this.infer({ 知识点: { 类别: KIND_NAMES[item.kind], 名称: item.name, 说明: item.note }, ...(lesson.length ? { 这节课在教: lesson } : {}),
+        现在的讲法: { 讲解: current.explain, 例子: current.example, 容易错的地方: current.pitfall || '' }, 已经变简单过几次: count },
+        { instructions: prompt('prereq-simpler'), schema: EXPAND_SCHEMA, purpose: 'prereq_simpler', key: rec.key, tokens: 4096, limit: 8000 }),
+      parse: moreOf });
+    return this.board.record(rec.key);
   }
   // Back to the telling before, from the list already made.
   back(body) {
     const { rec, item } = this.open(body);
-    const more = item.more, versions = more?.status === 'ready' ? versionsOf(more) : [], at = more?.at ?? 0;
-    check(at > 0 && versions[at - 1], '已经是第一种讲法了。', 409);
-    item.more = { ...more, ...versions[at - 1], versions, at: at - 1 };
-    return this.board.save(rec);
+    earlierTelling({ access: this.tellings(rec.key, item.id), show: showTelling });
+    return this.board.record(rec.key);
+  }
+  // An opened item's tellings, as they are kept now. An item opened before there were more tellings has one.
+  tellings(key, itemId) {
+    return fn => {
+      const rec = this.board.record(key), list = rec?.prereq, item = list?.status === 'ready' ? list.items.find(i => i.id === itemId) : null;
+      const more = item?.more?.status === 'ready' ? item.more : null;
+      if (more) { more.versions = versionsOf(more); more.at ??= 0; more.limit ??= MAX_VERSIONS; }
+      this.count = false;
+      fn(more);
+      if (this.count) list.expands = (list.expands || 0) + 1;
+      if (rec) this.board.save(rec);
+    };
   }
   // The item of the list on screen that a request is about.
   open(body) {
     fields(body, ['key', 'item'], ['key', 'item']); id(body.item);
     const rec = this.board.active(body.key), list = rec.prereq, item = list?.status === 'ready' ? list.items.find(i => i.id === body.item) : null;
     check(item?.more, '这一项还没有展开，或者清单已经变了。', 409);
+    check(item.more.status === 'ready', '先把这一项展开。', 409);
     return { rec, item };
   }
 }

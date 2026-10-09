@@ -49,14 +49,14 @@ test('a tutorial is told again from its own text, and the next telling starts fr
   const { board, simplers, calls } = setup(simple);
   board.capture(tutorial);
   simplers.simpler({ key: '9-t1' });
-  assert.equal(held(board, '9-t1').status, 'running');
+  assert.equal(held(board, '9-t1').simplifying.status, 'running');
   await settle();
   const first = calls[0];
   assert.match(first.packet.这一步的原文, /complement of an event/);
   assert.equal(first.packet.现在的讲法, undefined); assert.equal(first.packet.已经变简单过几次, 0);
   assert.equal(first.opts.purpose, 'simpler_step');
   assert.match(first.opts.instructions, /相关基础知识更少的人/);
-  assert.deepEqual(held(board, '9-t1').versions, [simple(1)]); assert.equal(held(board, '9-t1').at, 0); assert.equal(held(board, '9-t1').status, 'idle');
+  assert.deepEqual(held(board, '9-t1').versions, [simple(1)]); assert.equal(held(board, '9-t1').at, 0); assert.equal(held(board, '9-t1').simplifying, undefined);
   simplers.simpler({ key: '9-t1' }); await settle();
   assert.equal(calls[1].packet.现在的讲法, simple(1)); assert.equal(calls[1].packet.已经变简单过几次, 1);
   assert.equal(held(board, '9-t1').at, 1); assert.equal(held(board, '9-t1').versions.length, 2);
@@ -91,10 +91,10 @@ test('a failed telling keeps the ones made and can be asked for again; nothing i
   simplers.simpler({ key: '9-t1' }); simplers.simpler({ key: '9-t1' }); await settle();
   assert.equal(calls.length, 1, 'a second ask while one is being written is not another call');
   simplers.simpler({ key: '9-t1' }); await settle();
-  assert.equal(held(board, '9-t1').status, 'error'); assert.match(held(board, '9-t1').error, /Gemini/);
+  assert.equal(held(board, '9-t1').simplifying.status, 'error'); assert.match(held(board, '9-t1').simplifying.error, /Gemini/);
   assert.equal(held(board, '9-t1').versions.length, 1);
   simplers.simpler({ key: '9-t1' }); await settle();
-  assert.equal(held(board, '9-t1').status, 'idle'); assert.equal(held(board, '9-t1').versions.length, 2);
+  assert.equal(held(board, '9-t1').simplifying, undefined); assert.equal(held(board, '9-t1').versions.length, 2);
   const bare = setup(simple, { key: '' }); bare.board.capture(tutorial);
   assert.throws(() => bare.simplers.simpler({ key: '9-t1' }), e => e.status === 503);
   assert.throws(() => simplers.simpler({ key: '9-t1', extra: 1 }));
@@ -108,7 +108,11 @@ test('tellings written for other words are not kept, TeX is put back, and a rest
   simplers.simpler({ key: '9-t1' }); await settle();
   assert.deepEqual(held(board, '9-t1').versions, [simple(2)], 'the old telling belonged to the old words');
   assert.equal(calls[1].packet.现在的讲法, undefined);
-  const rec = board.record('9-t1'); rec.simpler = { ...rec.simpler, status: 'running', id: 'x' }; store.putStep(rec);
-  new Simplers(board, { geminiKey: 'k' }, async () => { throw new Error('unused'); });
-  assert.equal(held(board, '9-t1').status, 'error'); assert.match(held(board, '9-t1').error, /重启/);
+  // One being written when the engine stopped, kept the way this version keeps it, and the way older ones did.
+  for (const being of [{ simplifying: { status: 'running', id: 'x', boot: 'gone' } }, { status: 'running', id: 'x' }]) {
+    const rec = board.record('9-t1'); rec.simpler = { ...rec.simpler, ...being }; store.putStep(rec);
+    new Simplers(board, { geminiKey: 'k' }, async () => { throw new Error('unused'); });
+    assert.equal(held(board, '9-t1').simplifying.status, 'error'); assert.match(held(board, '9-t1').simplifying.error, /重启/);
+    delete rec.simpler.status; store.putStep({ ...rec, simpler: { ...held(board, '9-t1'), simplifying: undefined } });
+  }
 });

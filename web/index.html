@@ -39,6 +39,8 @@
     <!-- 一步：内容在上（中文），然后是前置知识。问一问在页面下面（宽屏在右边）。讲解、例题、练习题都是这一套。 -->
     <section id="step" hidden>
       <p id="step-title" class="eyebrow"></p>
+      <!-- 定位：这节课在数学里的位置（科目 · 模块 · 学段），一节课一份；点开看讲什么、模块是做什么的、建立在哪些模块上。 -->
+      <div id="place" data-ask="place" hidden><p id="place-line"></p><div id="place-more" hidden></div></div>
       <button id="status-line" class="status-line" hidden></button>
       <div id="context" class="mathtext" data-ask="question"></div>
       <ol id="choices" class="choices" data-ask="choices" hidden></ol>
@@ -60,12 +62,21 @@
         <div id="simpler-box" class="mathtext" hidden></div>
       </div>
 
-      <div class="tools"><button id="prereq-toggle">前置知识</button></div>
+      <div class="tools"><button id="prereq-toggle">前置知识</button><button id="later-toggle" hidden>学这个有什么用</button></div>
       <div id="prereq" data-ask="prereq" hidden>
         <p class="verdict-line"><b id="prereq-title"></b></p>
+        <!-- Math Academy 自己列的前置知识点（中文名），点了打开它的讲义页。复习题交答案之前不显示。 -->
+        <p id="prereq-official" hidden></p>
         <p id="prereq-status" class="muted"></p>
         <div id="prereq-list"></div>
         <p id="prereq-note" class="muted"></p>
+      </div>
+      <!-- 学这个有什么用：这节课以后通向哪里（工程化与现实应用、高级数学衔接）。一节课一份；练习题交了答案才有。 -->
+      <div id="later" data-ask="later" hidden>
+        <p class="verdict-line"><b>学这个有什么用</b></p>
+        <p id="later-status" class="muted"></p>
+        <div id="later-list"></div>
+        <p class="muted later-note">这是模型整理的参考，一节课一份。每一条都可以点开看具体怎么用上。</p>
       </div>
 
     </section>

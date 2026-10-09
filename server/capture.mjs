@@ -8,10 +8,11 @@ import { check } from './validation.mjs';
 //   { page: 'lesson', task, topic, url, step: { id, type, index, total }, title,
 //     sections: { body | question | explanation: Paragraphs, choices: [{ letter, content, picked }], result, answer } }
 //
-// A review page arrives like a lesson step, and only ever as a practice question. Other pages (quiz, diagnostic…)
+// A review page, and the answers of a task already done, arrive like a lesson step, and only ever as a practice question. Other pages (quiz, diagnostic…)
 // arrive as { page, task?, topic? } with no content.
 
 const TYPES = { t: 'tutorial', e: 'example', q: 'question' };
+export const STEP_PAGES = ['lesson', 'review', 'answers', 'topic'];
 const MAX_PARAS = 80, MAX_PARTS = 80, MAX_TEXT = 4000, MAX_TEX = 2000, MAX_MML = 30000;
 
 function parts(list) {
@@ -31,12 +32,35 @@ export function paragraphs(list) {
   return list.slice(0, MAX_PARAS).map(parts).filter(p => p.length);
 }
 
+// Math Academy's own prerequisites of topics, as its pages list them (a topic's page in its sidebar, the /learn page under
+// each task): for each topic, the names of the topics it builds on and the links to their pages.
+const MAX_OFFICIAL = 80, MAX_PREREQS = 12;
+export function officialOf(list) {
+  if (!Array.isArray(list)) return [];
+  const digits = v => typeof v === 'string' && /^\d{1,20}$/.test(v) ? v : null;
+  return list.slice(0, MAX_OFFICIAL).flatMap(o => {
+    const topic = digits(o?.topic);
+    const prereqs = (Array.isArray(o?.prereqs) ? o.prereqs : []).slice(0, MAX_PREREQS).flatMap(p => {
+      const name = typeof p?.name === 'string' ? p.name.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+      const href = typeof p?.href === 'string' && /^\/topics\/[\w-]{1,160}$/.test(p.href) ? p.href : '';
+      return name && href ? [{ name, href, topic: digits(p.topic) }] : [];
+    });
+    return topic && prereqs.length ? [{ topic, prereqs }] : [];
+  });
+}
+
 export function normalize(input) {
+  const c = normalizeStep(input), official = officialOf(input.official);
+  return official.length ? { ...c, official } : c;
+}
+function normalizeStep(input) {
   check(input && typeof input === 'object' && !Array.isArray(input), 'Expected an object');
   const page = typeof input.page === 'string' && /^[a-z-]{1,30}$/.test(input.page) ? input.page : 'other';
   const digits = v => typeof v === 'string' && /^\d{1,20}$/.test(v) ? v : null;
   const task = digits(input.task), topic = digits(input.topic);
-  if (page !== 'lesson' && page !== 'review') return { page, task, topic };
+  // Steps come from a lesson, a review, the answers of a task already done (opened on the /learn page), or a topic's own
+  // page (its tutorials and examples; its number stands in for the task).
+  if (!STEP_PAGES.includes(page)) return { page, task, topic };
   check(task, 'Invalid task');
   const s = input.step;
   if (!s) return { page, task, topic, step: null };
@@ -44,7 +68,9 @@ export function normalize(input) {
   const step = { id: s.id, type: TYPES[s.id[0]] || 'other',
     index: Number.isInteger(s.index) && s.index >= 0 ? s.index : 0, total: Number.isInteger(s.total) && s.total > 0 ? s.total : 0 };
   // A review is a run of practice questions, and nothing else is taken from it.
-  if (page === 'review' && step.type !== 'question') return { page, task, topic, step: null };
+  // A review and a task's answers hold only questions; a topic's own page only tutorials and examples.
+  if (['review', 'answers'].includes(page) && step.type !== 'question') return { page, task, topic, step: null };
+  if (page === 'topic' && step.type === 'question') return { page, task, topic, step: null };
   const sec = input.sections && typeof input.sections === 'object' ? input.sections : {};
   const sections = {};
   for (const name of ['body', 'question', 'explanation']) if (sec[name]) sections[name] = paragraphs(sec[name]);

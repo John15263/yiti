@@ -54,7 +54,8 @@ function align(table) {
 const TABULAR = /\\begin\{[A-Za-z]*(?:matrix|array|cases|align|gather)[A-Za-z*]*\}/;
 export function formula(part) {
   // Math Academy's own MathML when it came with the formula (and has its table); else what tex.js can make of the TeX.
-  const kept = part.mml && !(TABULAR.test(part.tex || '') && !/<mtable/.test(part.mml)) ? part.mml : '';
+  // An error MathJax drew in place of a formula is not the formula: it is drawn from the TeX instead.
+  const kept = part.mml && !/<merror/.test(part.mml) && !(TABULAR.test(part.tex || '') && !/<mtable/.test(part.mml)) ? part.mml : '';
   const mml = kept || texToMathML(part.tex, part.display);
   if (mml) {
     const parsed = new DOMParser().parseFromString(mml, 'text/html').body.firstElementChild;

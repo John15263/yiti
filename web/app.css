@@ -4,8 +4,12 @@
 button{font:inherit;color:inherit;border:1px solid #cfd6dc;background:transparent;border-radius:999px;padding:10px 20px;min-height:42px;cursor:pointer;font-size:calc(14px*var(--fs));transition:background .15s ease,border-color .15s ease}
 button:hover{background:#eef2f5}button:disabled{opacity:.4;cursor:default}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}button.primary:hover{background:#244a60}
-button.link{border:0;min-height:0;padding:0;border-radius:0;background:none;color:var(--muted);font-size:calc(13px*var(--fs));text-decoration:underline;text-underline-offset:3px;text-decoration-color:#c9d1cc}
-button.link:hover{background:none;color:var(--ink)}
+/* 能点的小字是蓝色的，一眼和灰色的说明分开。 */
+button.link{border:0;min-height:0;padding:0;border-radius:0;background:none;color:var(--accent);font-weight:500;font-size:calc(13px*var(--fs));text-decoration:underline;text-underline-offset:3px;text-decoration-color:#b7cad6}
+button.link:hover{background:none;color:#1d3e52;text-decoration-color:currentColor}
+/* 胶囊按钮：最常用的那几个（更简单的解释、进一步展开、具体怎么用上……），浅蓝底、圆角。收起、重试这类次要的仍是蓝色小字。 */
+button.pill{min-height:0;padding:2px 11px;border:1px solid #c7d7e2;border-radius:999px;background:#eef4f8;color:var(--accent);font-weight:500;font-size:calc(13px*var(--fs));line-height:1.6;vertical-align:baseline}
+button.pill:hover{background:#dde9f1;border-color:#a9c2d3}
 button:focus-visible,a:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px solid #6d8fa6;outline-offset:3px}
 [hidden]{display:none!important}
 code{font-family:"SF Mono",Menlo,monospace;font-size:.9em;background:var(--soft);padding:1px 5px;border-radius:4px}
@@ -80,12 +84,30 @@ code.tex{white-space:pre-wrap}
 #simpler-box p.wait{color:var(--muted)}
 
 /* 前置知识 */
-.tools{margin:20px 0 8px}
+.tools{margin:20px 0 8px;display:flex;flex-wrap:wrap;gap:8px}
+#later{margin:6px 0 4px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fbfcfb}
+#later .verdict-line{margin:0 0 4px}#later h4{margin:14px 0 4px;font-size:calc(14px*var(--fs));font-weight:600}
+.later-items{list-style:none;margin:0;padding:0}.later-items li{font-size:calc(15px*var(--fs));line-height:1.85;padding:4px 0}
+.later-tag{display:inline-block;margin-right:8px;padding:0 7px;border-radius:9px;background:var(--soft);color:var(--muted);font-size:calc(12px*var(--fs));line-height:1.7}
+.later-real{display:block;color:var(--muted);font-size:calc(14px*var(--fs))}
+.later-far{margin-left:8px;color:var(--muted);font-size:calc(12px*var(--fs))}
+.later-items button.link,.later-items button.pill{margin-left:8px}
+#place{margin:-2px 0 10px}#place-line{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;margin:0;font-size:calc(13px*var(--fs));color:var(--muted)}
+#place-line b{font-weight:500;color:var(--ink)}#place-line button.link{margin:0}
+#place-more{margin:6px 0 0;padding:8px 12px;background:var(--soft);border-radius:8px;font-size:calc(14px*var(--fs));line-height:1.8}
+#place-more p{margin:0 0 4px}#place-more p:last-child{margin:0}#place-more b{color:var(--muted);font-weight:500;margin-right:4px}
+.later-how{color:var(--muted);margin-left:18px!important}
+#prereq-official{margin:2px 0 8px;font-size:calc(14px*var(--fs));line-height:1.9}
+#prereq-official b{font-weight:500;color:var(--muted);margin-right:4px}
+#prereq-official a{color:var(--accent);font-weight:500;text-decoration:underline;text-underline-offset:3px;text-decoration-color:#b7cad6}
+#prereq-official a:hover{color:#1d3e52;text-decoration-color:currentColor}
+.later-again{margin:10px 0 0}
+.later-note{margin:12px 0 0;font-size:calc(13px*var(--fs))}
 #prereq{margin:6px 0 4px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#fbfcfb}
 #prereq .verdict-line{margin:0 0 4px}#prereq h4{margin:12px 0 2px;font-size:calc(13px*var(--fs));font-weight:500;color:var(--muted)}
 .prereq-items{list-style:none;margin:0;padding:0}.prereq-items li{font-size:calc(15px*var(--fs));line-height:1.85;padding:2px 0}
 .prereq-items b{font-weight:500;margin-right:10px}.prereq-items span{color:var(--muted);font-size:calc(14px*var(--fs))}
-.prereq-items button.link{margin-left:10px}
+.prereq-items button.link,.prereq-items button.pill{margin-left:10px}
 .prereq-more{margin:6px 0 10px;padding:10px 14px;background:var(--soft);border-radius:8px;font-size:calc(14px*var(--fs));line-height:1.85;color:var(--ink)}
 .prereq-tellings{display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline;margin:8px 0 0!important}.prereq-tellings button.link{margin:0}
 .prereq-more p{margin:0 0 6px}.prereq-more p:last-child{margin:0}.prereq-more b{color:var(--muted);font-weight:500;margin-right:4px}

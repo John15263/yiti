@@ -1,5 +1,6 @@
 import { check, fields } from './validation.mjs';
-import { textJSON, textError, textConfigured, textKeyMissing } from './llm.mjs';
+import { textJSON } from './llm.mjs';
+import { simplerTelling, earlierTelling, staleTelling } from './retell.mjs';
 import { prompt, cut } from './teach.mjs';
 import { lessonTitles } from './board.mjs';
 import { contextOf } from './voice.mjs';
@@ -17,57 +18,53 @@ const PROMPTS = { step: 'simpler-step', answered: 'simpler-answered' };
 export const SIMPLER_SCHEMA = { type: 'object', additionalProperties: false, required: ['text'], properties: { text: { type: 'string' } } };
 export const simplerMode = rec => isContent(rec) ? 'step' : answered(rec) ? 'answered' : null;
 
-export function simplerPacket(rec, lesson, versions) {
+export function simplerPacket(rec, lesson, versions, count = versions.length) {
   const context = simplerMode(rec) === 'answered' ? contextOf(rec, { mode: 'answered' }) : contextOf(rec, { mode: 'learn' }, lesson);
-  return { ...context, ...(versions.length ? { 现在的讲法: versions.at(-1) } : {}), 已经变简单过几次: versions.length };
+  return { ...context, ...(versions.length ? { 现在的讲法: versions.at(-1) } : {}), 已经变简单过几次: count };
 }
 
 export class Simplers {
   constructor(board, cfg, infer = (packet, opts) => textJSON(packet, cfg, opts)) {
     this.board = board; this.cfg = cfg; this.infer = infer;
-    // A call cut off by a restart is never replayed; it is marked so it can be asked for again.
+    // A call cut off by a restart is never replayed; it is marked so it can be asked for again. (Older records kept it as status.)
     for (const rec of board.store.steps()) {
-      if (rec.simpler?.status === 'running') { rec.simpler = { ...rec.simpler, status: 'error', error: '服务重启，写这一段中断了，可以重试。' }; board.store.putStep(rec); }
+      const s = rec.simpler;
+      if (s?.status === 'running') { delete s.status; s.simplifying = { status: 'running' }; }
+      if (staleTelling(s, null, '服务重启，写这一段中断了，可以重试。')) board.store.putStep(rec);
     }
   }
-  // The next simpler telling of the step on screen: the one already made after the one shown, else a new one.
+  // The next simpler telling of the step on screen: the one already made after the one shown, else a new one (retell.mjs).
   simpler(body) {
     fields(body, ['key'], ['key']);
     const rec = this.board.active(body.key), mode = simplerMode(rec);
     check(mode, '交答案之前，这道题不能讲。', 409);
     // What was written for other words, or for the step before it was answered, is not kept.
-    let s = rec.simpler;
-    if (!s || s.hash !== rec.text_hash || s.mode !== mode) s = rec.simpler = { hash: rec.text_hash, mode, versions: [], at: -1, status: 'idle', limit: MAX_VERSIONS };
-    if (s.status === 'running') return this.board.save(rec);
-    if (s.at < s.versions.length - 1) { s.at++; return this.board.save(rec); }
-    check(s.versions.length < MAX_VERSIONS, '已经是最简单的一版了。还不明白的话，问问陪练。', 409);
-    check(textConfigured(this.cfg), textKeyMissing(this.cfg), 503);
-    const started = crypto.randomUUID();
-    Object.assign(s, { status: 'running', id: started, error: undefined });
-    this.board.save(rec);
-    const packet = simplerPacket(rec, lessonTitles(this.board.store, rec), s.versions);
-    Promise.resolve().then(async () => {
-      const { value, model } = await this.infer(packet, { instructions: prompt(PROMPTS[mode]), schema: SIMPLER_SCHEMA, purpose: `simpler_${mode}`, key: rec.key, tokens: 4096, limit: 12000 });
-      const text = cut(value?.text, 3000);
-      check(text, 'Invalid model response');
-      const latest = this.board.record(rec.key), held = latest?.simpler;
-      if (held?.id !== started || held.status !== 'running') return;
-      // The new telling is shown at once unless the learner has gone back to an earlier one meanwhile.
-      const shown = held.at === held.versions.length - 1;
-      latest.simpler = { ...held, versions: [...held.versions, text], at: shown ? held.versions.length : held.at, status: 'idle', id: undefined, model };
-      this.board.save(latest);
-    }).catch(error => {
-      const latest = this.board.record(rec.key);
-      if (latest?.simpler?.id === started && latest.simpler.status === 'running') { latest.simpler = { ...latest.simpler, status: 'error', error: textError(error, this.cfg), id: undefined }; this.board.save(latest); }
-    });
-    return rec;
+    if (!(rec.simpler?.hash === rec.text_hash && rec.simpler.mode === mode)) {
+      rec.simpler = { hash: rec.text_hash, mode, versions: [], at: -1, limit: MAX_VERSIONS };
+      this.board.save(rec);
+    }
+    const lesson = lessonTitles(this.board.store, rec);
+    simplerTelling({ access: this.tellings(rec.key, rec.text_hash, mode), cfg: this.cfg, boot: this.board.boot, base: 0,
+      call: (current, count) => this.infer(simplerPacket(rec, lesson, current ? [current] : [], count),
+        { instructions: prompt(PROMPTS[mode]), schema: SIMPLER_SCHEMA, purpose: `simpler_${mode}`, key: rec.key, tokens: 4096, limit: 12000 }),
+      parse: value => cut(value?.text, 3000) || null });
+    return this.board.record(rec.key);
   }
   // Back to the telling before, from those already made.
   back(body) {
     fields(body, ['key'], ['key']);
-    const rec = this.board.active(body.key), s = rec.simpler;
-    check(s?.hash === rec.text_hash && s.at > 0, '已经是第一种讲法了。', 409);
-    s.at--;
-    return this.board.save(rec);
+    const rec = this.board.active(body.key);
+    earlierTelling({ access: this.tellings(rec.key, rec.text_hash, rec.simpler?.mode) });
+    return this.board.record(rec.key);
+  }
+  // The step's tellings as they are kept now; none once its words, or whether it is answered, have changed.
+  tellings(key, hash, mode) {
+    return fn => {
+      const rec = this.board.record(key), s = rec?.simpler;
+      const fresh = s?.hash === hash && s.hash === rec.text_hash && s.mode === mode ? s : null;
+      if (fresh) { delete fresh.status; delete fresh.error; delete fresh.id; }
+      fn(fresh);
+      if (rec) this.board.save(rec);
+    };
   }
 }

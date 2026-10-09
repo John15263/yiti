@@ -33,7 +33,7 @@ export function ideasFor(rec) {
 // Where on the page a selection may be taken from. A practice question not yet answered is the one thing the tutor must
 // not be handed: before the answer its own words (the question and its choices) get no shortcut, so it is never
 // one click away from being sent. The rest of the page, and the question once answered, do.
-const AREAS = new Set(['question', 'choices', 'content', 'answer', 'simpler', 'prereq', 'chat']);
+const AREAS = new Set(['question', 'choices', 'content', 'answer', 'simpler', 'prereq', 'later', 'place', 'chat']);
 export function mayAsk(rec, area) {
   if (!rec?.step || !AREAS.has(area)) return false;
   return !(unanswered(rec) && (area === 'question' || area === 'choices'));

@@ -5,6 +5,9 @@ import { Board } from '../server/board.js';
 import { Teach, usePrompts } from '../server/teach.js';
 import { Prereqs } from '../server/prereq.js';
 import { Simplers } from '../server/simpler.js';
+import { Laters } from '../server/later.js';
+import { Places } from '../server/place.js';
+import { Officials } from '../server/official.js';
 import { Chats } from '../server/chat.js';
 import { config } from '../server/config.js';
 import { Settings, testServices } from '../server/settings.js';
@@ -36,12 +39,15 @@ cfg.usage = {
 };
 
 const listeners = new Set();
-const view = () => { const s = board.state(); return { ...s, gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build: null }; };
+const view = () => { const s = board.state(); return { ...s, official: officials.of(s.record), place: places.of(s.record), later: laters.of(s.record), gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build: null }; };
 const publish = () => { const value = view(); for (const listener of listeners) listener(value); };
 const board = new Board(store, publish);
 const teach = new Teach(board, cfg);
-const prereqs = new Prereqs(board, cfg);
+const places = new Places(board, cfg);
+const officials = new Officials(board, cfg);
+const prereqs = new Prereqs(board, cfg, undefined, places);
 const simplers = new Simplers(board, cfg);
+const laters = new Laters(board, cfg, undefined, places);
 const chats = new Chats(board, cfg);
 
 // Gemini Live takes its key in the address, so a plain socket reaches it; Qwen goes over WebRTC.
@@ -64,6 +70,12 @@ export async function request(path, body) {
     if (path === '/api/prereq/back') { prereqs.back(body); return view(); }
     if (path === '/api/simpler') { simplers.simpler(body); return view(); }
     if (path === '/api/simpler/back') { simplers.back(body); return view(); }
+    if (path === '/api/official') { officials.translate(body); return view(); }
+    if (path === '/api/place') { places.start(body); return view(); }
+    if (path === '/api/later') { laters.start(body); return view(); }
+    if (path === '/api/later/expand') { laters.expand(body); return view(); }
+    if (path === '/api/later/simpler') { laters.simpler(body); return view(); }
+    if (path === '/api/later/back') { laters.back(body); return view(); }
     if (path === '/api/chat') { chats.send(body); return view(); }
     if (path === '/api/chat/retry') { chats.retry(body); return view(); }
     if (path === '/api/demo') { board.capture(DEMO); return view(); }

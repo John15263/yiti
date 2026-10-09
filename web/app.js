@@ -8,14 +8,16 @@ import { threadItems } from './thread.js';
 import { sizeOf, stepSize, percent, SIZES } from './size.js';
 import { formulaReport } from './report.js';
 import { createSettings } from './settings.js';
+import { tellingBar } from './retell.js';
 import { request, subscribe } from './backend.js';
 import { newestOnly } from './order.js';
 
 const $ = id => document.getElementById(id);
 const KIND = { tutorial: '讲解', example: '例题', question: '练习题' };
 const PAGES = { quiz: '测验', multistep: '多步题', diagnostic: '诊断', assessment: '测评' };
-const STEP_PAGES = ['lesson', 'review'];
-let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnContent = '', drawnExplain = '', explainOpen = false, prereqOpen = '', prereqMore = new Set();
+const STEP_PAGES = ['lesson', 'review', 'answers', 'topic'];
+let askedForKey = false, state = null, build = null, shownKey = '', drawnContext = '', drawnContent = '', drawnExplain = '', explainOpen = false, prereqOpen = '', prereqMore = new Set(), laterOpen = false;
+const laterMore = new Set(), laterUses = new Set();
 const asked = new Set();
 const record = () => state?.record || null;
 
@@ -66,7 +68,7 @@ function render(next) {
   const cur = next.current, rec = next.record, onStep = !!rec && STEP_PAGES.includes(cur?.page);
   dock.show(onStep);
   syncPill(rec);
-  $('where').textContent = !onStep ? '' : cur.page === 'review' ? '复习 · 练习题' : `${rec.step.index + 1} / ${rec.step.total} · ${KIND[rec.step.type] || ''}`;
+  $('where').textContent = !onStep ? '' : cur.page === 'review' ? '复习 · 练习题' : cur.page === 'answers' ? `做过的题 · ${rec.step.index + 1} / ${rec.step.total}` : cur.page === 'topic' ? `知识点讲义 · ${rec.step.index + 1} / ${rec.step.total} · ${KIND[rec.step.type] || ''}` : `${rec.step.index + 1} / ${rec.step.total} · ${KIND[rec.step.type] || ''}`;
   $('lang').hidden = !onStep;
   $('lang').textContent = lang === 'zh' ? 'EN' : '中';
   $('lang').title = lang === 'zh' ? '看英文原文' : '看中文';
@@ -77,8 +79,10 @@ function render(next) {
   if (!onStep) {
     show('elsewhere');
     const name = PAGES[cur.page];
-    $('elsewhere-title').textContent = STEP_PAGES.includes(cur.page) ? (cur.page === 'review' ? '复习中，正在读这道题…' : '正在读这一步…') : name ? `${name}中，一题不参与。` : '现在不在一节课里。';
-    $('elsewhere-note').textContent = STEP_PAGES.includes(cur.page) ? '' : name ? '这里测的是你自己会不会。做完回到课里，这里会跟过去。' : '打开一节课，这里会跟到你正在看的那一步。';
+    $('elsewhere-title').textContent = STEP_PAGES.includes(cur.page) ? (cur.page === 'review' ? '复习中，正在读这道题…' : cur.page === 'answers' ? '正在读做过的题…' : '正在读这一步…')
+      : name ? `${name}中，一题不参与。` : cur.page === 'learn' ? '这里是学习主页。' : '现在不在一节课里。';
+    $('elsewhere-note').textContent = STEP_PAGES.includes(cur.page) ? '' : name ? '这里测的是你自己会不会。做完回到课里，这里会跟过去。'
+      : cur.page === 'learn' ? '点开一个做完的任务看它的题目和解答，或者开始一节课，这里会跟过去。' : '打开一节课，这里会跟到你正在看的那一步。';
     voice.update(); return;
   }
   show('step');
@@ -88,11 +92,13 @@ function render(next) {
   // A question's own title is only "Question 2"; the step counter already says that.
   const title = rec.step.type === 'question' ? '' : shown(rec).title;
   $('step-title').textContent = title; $('step-title').hidden = !title;
+  renderPlace(rec, next.place);
   renderContext(rec);
   renderContent(rec);
   renderAnswer(rec);
   renderSimpler(rec);
   renderTools(rec);
+  renderLater(rec, next.later);
   drawChat(rec);
   // Waiting and errors for the whole step share one quiet line; an error can be clicked to try again.
   const retry = notes.find(n => n.retry);
@@ -112,6 +118,34 @@ function translation(rec, gemini, notes) {
   else if (fresh && t.status === 'ready') { if (t.missing) notes.push({ text: `有 ${t.missing} 段没翻好，显示的是原文。` }); }
   else notes.push({ text: '正在翻成中文…' });
   if (gemini && !(fresh && ['running', 'ready', 'error'].includes(t.status)) && !asked.has(ask)) { asked.add(ask); void post('/api/translate', { key: rec.key }); }
+}
+
+// 定位: where the lesson sits in mathematics, one line under the title, opened for a few more. Made once per lesson, on
+// request here or along with the first 前置知识 or 学这个有什么用.
+const STAGE = { primary: '小学', middle: '初中', high: '高中', college: '大学' };
+let placeOpen = false, drawnPlace = '';
+function renderPlace(rec, place) {
+  $('place').hidden = !place;
+  if (!place) return;
+  const sig = JSON.stringify([rec.key, place, placeOpen]);
+  if (sig === drawnPlace) return;
+  drawnPlace = sig;
+  const line = $('place-line'), more = $('place-more');
+  const link = (text, act) => { const b = document.createElement('button'); b.className = 'link'; b.textContent = text; b.onclick = act; return b; };
+  const ask = () => void post('/api/place', { key: rec.key });
+  line.replaceChildren(); more.hidden = true;
+  if (place.status === 'none') { line.append(Object.assign(link('这节课在数学里的位置', ask), { className: 'pill' })); return; }
+  if (place.status === 'running') { line.textContent = '正在给这节课定位…'; return; }
+  if (place.status === 'error') { line.append(place.error || '', link('重试', ask)); return; }
+  const where = document.createElement('b');
+  where.textContent = [place.subject, place.module, place.stage ? `${STAGE[place.stage]}阶段` : ''].filter(Boolean).join(' · ');
+  line.append('定位：', where, link(placeOpen ? '收起' : '展开', () => { placeOpen = !placeOpen; render(state); }));
+  if (!placeOpen) return;
+  more.hidden = false;
+  more.replaceChildren(...[['这节课：', place.summary], ['这个模块：', place.module_note], ['建立在：', place.before?.join('、')]].filter(([, t]) => t).map(([label, text]) => {
+    const p = document.createElement('p'), tag = document.createElement('b'), body = document.createElement('span');
+    tag.textContent = label; rich(body, text); p.append(tag, body); return p;
+  }));
 }
 
 // The question of an example, or of a practice question, stays on top as context.
@@ -169,22 +203,16 @@ function renderSimpler(rec) {
   const sig = JSON.stringify([rec.key, s, open]);
   if (sig === drawnSimpler) return;
   drawnSimpler = sig;
-  const versions = s?.versions || [], at = s?.at ?? -1, status = s?.status || 'idle', bar = $('simpler-bar'), box = $('simpler-box');
-  const say = (text, muted) => { const span = document.createElement('span'); span.textContent = text; if (muted) span.className = 'muted'; return span; };
+  const versions = s?.versions || [], at = s?.at ?? -1, running = s?.simplifying?.status === 'running', bar = $('simpler-bar'), box = $('simpler-box');
   const link = (text, act) => { const b = document.createElement('button'); b.className = 'link'; b.textContent = text; b.onclick = act; return b; };
   const ask = () => { simplerOpen.add(rec.key); void post('/api/simpler', { key: rec.key }); render(state); };
   bar.replaceChildren(); box.hidden = true;
-  if (!open) { bar.append(link(versions.length ? `更简单的解释（已写过 ${versions.length} 种）` : '更简单的解释', () => { if (versions.length) { simplerOpen.add(rec.key); render(state); } else ask(); })); return; }
+  if (!open) { bar.append(Object.assign(link(versions.length ? `更简单的解释（已写过 ${versions.length} 种）` : '更简单的解释', () => { if (versions.length) { simplerOpen.add(rec.key); render(state); } else ask(); }), { className: 'pill' })); return; }
   // What is on screen: the telling asked for, or that one is being written.
   box.hidden = false;
   box.replaceChildren(...(at >= 0 ? versions[at].split(/\n{2,}/).map(t => t.trim()).filter(Boolean).map(t => { const p = document.createElement('p'); rich(p, t); return p; })
-    : [Object.assign(document.createElement('p'), { className: 'wait', textContent: status === 'error' ? '' : '正在写一个更简单的讲法…' })]));
-  if (versions.length > 1) bar.append(say(`第 ${at + 1} / ${versions.length} 种讲法`, true));
-  if (at > 0) bar.append(link('上一种讲法', () => void post('/api/simpler/back', { key: rec.key })));
-  if (status === 'running') bar.append(say(at >= 0 ? '正在写更简单的讲法…' : '', true));
-  else if (status === 'error') bar.append(say(s.error, true), link('重试', ask));
-  else if (at < versions.length - 1 || versions.length < (s?.limit || 3)) bar.append(link('更简单的解释', ask));
-  else bar.append(say('已经是最简单的一版了。还不明白的话，问问陪练。', true));
+    : [Object.assign(document.createElement('p'), { className: 'wait', textContent: running ? '正在写一个更简单的讲法…' : '' })]));
+  bar.append(...tellingBar(s, path => path === 'back' ? void post('/api/simpler/back', { key: rec.key }) : ask(), { working: at >= 0 ? '正在写更简单的讲法…' : '' }));
   bar.append(link('收起', () => { simplerOpen.delete(rec.key); render(state); }));
 }
 
@@ -200,6 +228,24 @@ function renderTools(rec) {
     ? '这是模型整理的参考，不是 Math Academy 的官方清单。只列更基础的知识，不涉及这道题怎么做，也不含这节课新教的内容。'
     : '这是模型整理的参考，不是 Math Academy 的官方清单。';
   drawPrereq(rec);
+  drawOfficial(rec, state.official);
+}
+// Math Academy's own prerequisites of this topic, in Chinese (the English on hover), each a link to its page there.
+let drawnOfficial = '';
+function drawOfficial(rec, official) {
+  const line = $('prereq-official'), sig = JSON.stringify([rec.key, official]);
+  line.hidden = !official;
+  if (!official || sig === drawnOfficial) return;
+  drawnOfficial = sig;
+  if (official.prereqs.some(p => !p.zh) && !asked.has(`o:${rec.key}`)) { asked.add(`o:${rec.key}`); void post('/api/official', { key: rec.key }); }
+  const label = document.createElement('b');
+  label.textContent = 'Math Academy 官方前置：';
+  line.replaceChildren(label, ...official.prereqs.flatMap((p, n) => {
+    const a = document.createElement('a');
+    a.href = `https://www.mathacademy.com${p.href}`; a.target = '_blank'; a.rel = 'noreferrer';
+    a.textContent = p.zh || p.name; a.title = p.zh ? `${p.name}（在 Math Academy 打开讲义）` : '在 Math Academy 打开讲义';
+    return n ? [document.createTextNode(' · '), a] : [a];
+  }));
 }
 let drawnPrereq = '';
 function drawPrereq(rec) {
@@ -226,19 +272,10 @@ function drawPrereq(rec) {
 }
 // Under an opened item: which telling this is, and the way to a simpler one (or back to the one before).
 function tellings(rec, item, m) {
-  const bar = document.createElement('p'), count = m.versions?.length || 1, at = m.at ?? 0, simplifying = m.simplifying;
+  const bar = document.createElement('p');
   bar.className = 'prereq-tellings';
-  const link = (text, path) => {
-    const button = document.createElement('button');
-    button.className = 'link'; button.textContent = text; button.onclick = () => void post(path, { key: rec.key, item: item.id });
-    return button;
-  };
-  if (count > 1) { const where = document.createElement('span'); where.className = 'muted'; where.textContent = `第 ${at + 1} / ${count} 种讲法`; bar.append(where); }
-  if (at > 0) bar.append(link('上一种讲法', '/api/prereq/back'));
-  if (simplifying?.status === 'running') { const wait = document.createElement('span'); wait.className = 'muted'; wait.textContent = '正在换一种更简单的讲法…'; bar.append(wait); }
-  else if (simplifying?.status === 'error') { const bad = document.createElement('span'); bad.className = 'muted'; bad.textContent = simplifying.error; bar.append(bad, link('重试', '/api/prereq/simpler')); }
-  else if (at < count - 1 || count < (m.limit || 4)) bar.append(link('更简单的解释', '/api/prereq/simpler'));
-  else { const end = document.createElement('span'); end.className = 'muted'; end.textContent = '已经是最简单的一版了。还不明白的话，问问陪练。'; bar.append(end); }
+  bar.append(...tellingBar({ versions: m.versions || [m], at: m.at ?? 0, limit: m.limit || 4, simplifying: m.simplifying },
+    path => void post(`/api/prereq/${path}`, { key: rec.key, item: item.id })));
   return bar;
 }
 // One item of the list, with a link that opens it up (what it is, an example of its own, where it is easy to go wrong).
@@ -246,7 +283,7 @@ function prereqItem(rec, i) {
   const li = document.createElement('li'), name = document.createElement('b'), note = document.createElement('span'), toggle = document.createElement('button');
   rich(name, i.name); rich(note, i.note);
   const open = prereqMore.has(i.id), ask = () => void post('/api/prereq/expand', { key: rec.key, item: i.id });
-  toggle.className = 'link'; toggle.textContent = open ? '收起' : '进一步展开';
+  toggle.className = open ? 'link' : 'pill'; toggle.textContent = open ? '收起' : '进一步展开';
   toggle.onclick = () => { if (open) prereqMore.delete(i.id); else { prereqMore.add(i.id); ask(); } render(state); };
   li.append(name, note, toggle);
   if (open) {
@@ -269,6 +306,98 @@ function prereqItem(rec, i) {
     li.append(box);
   }
   return li;
+}
+
+// 学这个有什么用: where the lesson leads, one list per lesson, shared by its steps. Not on a question still to be answered:
+// the learner is working on it then. Open or closed is kept across the steps of the lesson.
+const LATER_LAYERS = { near: '身边', mid: '大工程', magic: '黑魔法' };
+const LATER_FAR = { soon: '很快会学到', later: '再往后几年', college: '大学或以后' };
+const laterOn = rec => isContent(rec) || answered(rec);
+let drawnLater = '';
+function renderLater(rec, list) {
+  const on = laterOn(rec), open = on && laterOpen;
+  $('later-toggle').hidden = !on;
+  $('later-toggle').textContent = open ? '收起「学这个有什么用」' : '学这个有什么用';
+  $('later').hidden = !open;
+  if (!open) return;
+  // Left open, it follows the learner into the next lesson, whose list is asked for once.
+  if (!list && !asked.has(`l:${rec.key}`)) { asked.add(`l:${rec.key}`); void post('/api/later', { key: rec.key }); }
+  const ready = list?.status === 'ready', sig = JSON.stringify([rec.key, list, [...laterMore], [...laterUses]]);
+  if (sig === drawnLater) return;
+  drawnLater = sig;
+  const status = $('later-status');
+  status.hidden = ready;
+  status.textContent = !list || list.status === 'running' ? '正在整理这节课以后通向哪里…' : list.error || '';
+  if (list?.status === 'error') {
+    const retry = document.createElement('button');
+    retry.className = 'link'; retry.textContent = '重新整理'; retry.onclick = () => void post('/api/later', { key: rec.key });
+    status.append(' ', retry);
+  }
+  const part = (title, items) => {
+    if (!items.length) return [];
+    const heading = document.createElement('h4'), ul = document.createElement('ul');
+    heading.textContent = title; ul.className = 'later-items';
+    ul.append(...items.map(i => laterItem(rec, i)));
+    return [heading, ul];
+  };
+  const again = document.createElement('p');
+  if (ready) {
+    const redo = document.createElement('button');
+    redo.className = 'link'; redo.textContent = '不太对？重新整理'; redo.onclick = () => void post('/api/later', { key: rec.key, again: true });
+    again.className = 'later-again'; again.append(redo);
+  }
+  $('later-list').replaceChildren(...(ready ? [...part('一、工程化与现实应用', list.apply), ...part('二、高级数学衔接', list.higher), again] : []));
+}
+function laterItem(rec, i) {
+  const li = document.createElement('li'), main = document.createElement('span'), far = document.createElement('span'), toggle = document.createElement('button');
+  if (i.layer) {
+    const tag = document.createElement('span'); tag.className = 'later-tag'; tag.textContent = LATER_LAYERS[i.layer];
+    const real = document.createElement('span'); real.className = 'later-real'; rich(real, i.real);
+    rich(main, `再学「${i.modules}」→ ${i.problem}`);
+    li.append(tag, main, far, toggle, real);
+  } else {
+    const solves = document.createElement('span'); solves.className = 'later-real'; rich(solves, i.solves);
+    rich(main, i.chain);
+    li.append(main, far, toggle, solves);
+  }
+  far.className = 'later-far'; far.textContent = LATER_FAR[i.distance] || '';
+  const open = laterMore.has(i.id);
+  toggle.className = open ? 'link' : 'pill'; toggle.textContent = open ? '收起' : '具体怎么用上';
+  toggle.onclick = () => { if (open) laterMore.delete(i.id); else { laterMore.add(i.id); void post('/api/later/expand', { key: rec.key, item: i.id }); } render(state); };
+  if (open) li.append(laterBox(rec, i, 'more'));
+  // A way up: what that mathematics is used for, one level only.
+  if (!i.layer) {
+    const usesOpen = laterUses.has(i.id), uses = document.createElement('button');
+    uses.className = usesOpen ? 'link' : 'pill'; uses.textContent = usesOpen ? '收起「那一层有什么用」' : '那一层有什么用';
+    uses.onclick = () => { if (usesOpen) laterUses.delete(i.id); else { laterUses.add(i.id); void post('/api/later/expand', { key: rec.key, item: i.id, part: 'uses' }); } render(state); };
+    toggle.after(uses);
+    if (usesOpen) li.append(laterBox(rec, i, 'uses'));
+  }
+  return li;
+}
+// What was made for an entry ("more": how it is used; "uses": what a higher mathematics is for), the telling on screen,
+// and the bar to tell it more simply.
+function laterBox(rec, i, part) {
+  const box = document.createElement('div'), m = i[part], body = { key: rec.key, item: i.id, part };
+  box.className = 'prereq-more';
+  if (!m || m.status === 'running') { box.textContent = '正在写…'; return box; }
+  if (m.status === 'error') {
+    const retry = document.createElement('button');
+    retry.className = 'link'; retry.textContent = '重试'; retry.onclick = () => void post('/api/later/expand', body);
+    box.append(`${m.error} `, retry); return box;
+  }
+  const t = m.versions[m.at], para = (label, text) => {
+    const p = document.createElement('p'), span = document.createElement('span');
+    if (label) { const tag = document.createElement('b'); tag.textContent = label; p.append(tag); }
+    rich(span, text); p.append(span); return p;
+  };
+  if (part === 'more') box.append(...[['', t.explain], ['例：', t.example]].filter(([, text]) => text).map(([label, text]) => para(label, text)));
+  else box.append(...t.uses.flatMap((u, n) => [para(`${n + 1}.`, u.what), Object.assign(para('', u.how), { className: 'later-how' })]));
+  const bar = document.createElement('p');
+  bar.className = 'prereq-tellings';
+  bar.append(...tellingBar(m, path => void post(`/api/later/${path}`, body)));
+  box.append(bar);
+  return box;
 }
 
 // 问一问: the conversation about this step, typed and spoken in one thread, and the box to go on with it. What the tutor
@@ -401,6 +530,14 @@ $('prereq-toggle').onclick = () => {
   prereqOpen = open ? '' : rec.key;
   render(state);
   if (!open) void post('/api/prereq', { key: rec.key });
+};
+$('later-toggle').onclick = () => {
+  const rec = record();
+  if (!rec) return;
+  // Opening it asks for the list (renderLater), unless the lesson has one already.
+  laterOpen = !laterOpen;
+  if (laterOpen) asked.delete(`l:${rec.key}`);
+  render(state);
 };
 $('chat-send').onclick = () => void sendChat();
 addEventListener('resize', grow);

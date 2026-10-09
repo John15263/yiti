@@ -7,6 +7,9 @@ import { Board } from './board.mjs';
 import { Teach } from './teach.mjs';
 import { Prereqs } from './prereq.mjs';
 import { Simplers } from './simpler.mjs';
+import { Laters } from './later.mjs';
+import { Places } from './place.mjs';
+import { Officials } from './official.mjs';
 import { Chats } from './chat.mjs';
 import './prompts-node.mjs';
 import { Voice } from './voice.mjs';
@@ -26,16 +29,19 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   const usage = new Usage(store); cfg = { ...cfg, usage };
   const files = new Map([
     ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.css', ['app.css', 'text/css; charset=utf-8']],
-    ...['app.js', 'ask.js', 'dock.js', 'math.js', 'mode.js', 'order.js', 'pick.js', 'report.js', 'size.js', 'tex.js', 'thread.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js', 'demo.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
+    ...['app.js', 'ask.js', 'dock.js', 'math.js', 'mode.js', 'order.js', 'pick.js', 'report.js', 'retell.js', 'size.js', 'tex.js', 'thread.js', 'voice.js', 'voice-worklet.js', 'settings.js', 'backend.js', 'demo.js'].map(f => [`/${f}`, [f, 'text/javascript; charset=utf-8']]),
   ]);
   // What the page's code is, so a page left open across a restart can tell it is running old code.
   const build = (() => { const hash = createHash('sha256'); for (const [file] of files.values()) { try { hash.update(readFileSync(join(webRoot, file))); } catch {} } return hash.digest('hex').slice(0, 12); })();
-  const view = () => { const s = board.state(); return { ...s, gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build }; };
+  const view = () => { const s = board.state(); return { ...s, official: officials.of(s.record), place: places.of(s.record), later: laters.of(s.record), gemini: textConfigured(cfg), voice: voiceConfigured(cfg), build }; };
   const publish = () => { const data = `event: state\ndata: ${JSON.stringify(view())}\n\n`; for (const res of streams) res.write(data); };
   const board = new Board(store, publish);
   const teach = new Teach(board, cfg, infer);
-  const prereqs = new Prereqs(board, cfg, infer);
+  const places = new Places(board, cfg, infer);
+  const officials = new Officials(board, cfg, infer);
+  const prereqs = new Prereqs(board, cfg, infer, places);
   const simplers = new Simplers(board, cfg, infer);
+  const laters = new Laters(board, cfg, infer, places);
   const chats = new Chats(board, cfg, infer);
   const voice = new Voice(board, cfg, connect);
   const sockets = new Set();
@@ -111,6 +117,12 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
         if (path === '/api/prereq/back') { prereqs.back(await body(req)); return json(res, view()); }
         if (path === '/api/simpler') { simplers.simpler(await body(req)); return json(res, view()); }
         if (path === '/api/simpler/back') { simplers.back(await body(req)); return json(res, view()); }
+        if (path === '/api/official') { officials.translate(await body(req)); return json(res, view()); }
+        if (path === '/api/place') { places.start(await body(req)); return json(res, view()); }
+        if (path === '/api/later') { laters.start(await body(req)); return json(res, view()); }
+        if (path === '/api/later/expand') { laters.expand(await body(req)); return json(res, view()); }
+        if (path === '/api/later/simpler') { laters.simpler(await body(req)); return json(res, view()); }
+        if (path === '/api/later/back') { laters.back(await body(req)); return json(res, view()); }
         // The example written for 一题 itself, followed as if it were open on Math Academy.
         if (path === '/api/demo') { await body(req); board.capture(DEMO); return json(res, view()); }
         if (path === '/api/translate') { teach.translate(await body(req)); return json(res, view()); }
@@ -138,6 +150,6 @@ export function createServer({ store, cfg, settings = new Settings(), webRoot, t
   });
   server.requestTimeout = 20000;
   server.headersTimeout = 10000;
-  return { server, board, teach, prereqs, simplers, chats, voice, usage, token,
+  return { server, board, teach, prereqs, simplers, laters, places, chats, voice, usage, token,
     closeStreams: () => { for (const res of streams) res.end(); for (const conn of sockets) conn.close(1001, 'Server stopping'); } };
 }
