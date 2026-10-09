@@ -4,7 +4,7 @@
 
 ## 1. 上传包（Packages）
 
-上传 `dist/yiti-extension-0.5.1.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。2026-09-26 提交审核的是 0.3.1；审核期间不要上传新包（会重新排队），通过后再用新版本更新。
+上传 `dist/yiti-extension-0.5.1.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。0.3.1 已通过审核（2026-10-02 确认）；0.5.1 是在它基础上的一次大更新（权限和主机权限和 0.3.1 完全一样，没有新增），用「更新」提交，不是新建加载项。
 
 包里的 `edge/_locales/<语言>/messages.json` 决定了商店里**不能再改**的两项，每种语言一份：
 
@@ -34,7 +34,7 @@
 ### Single Purpose Description
 
 ```
-Helps Chinese-speaking students study on Math Academy: in a side panel, it follows the lesson step the student has open, translates it into Chinese, lists the more basic prerequisite knowledge behind the step (each item can be opened up for a fuller explanation), lets the student ask questions about the step at any time, and offers a voice tutor. It never helps solve a practice question before the student has answered it: until then the assistant is not even shown the question.
+Helps Chinese-speaking students study on Math Academy: in a side panel, it follows the lesson step the student has open, translates it into Chinese, lists the more basic prerequisite knowledge behind the step (each item can be opened up for a fuller explanation, and retold more simply), can retell the step's explanation for someone with less background, lets the student ask questions about the step at any time, and offers a voice tutor. It never helps solve a practice question before the student has answered it: until then the assistant is not even shown the question.
 ```
 
 ### Permission justification
@@ -87,9 +87,9 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 | Extension logo（必填） | `logo-300.png` |
 | Small promotional tile | `tile-440x280.png` |
 | Large promotional tile | `tile-1400x560.png` |
-| Screenshots（按顺序） | `screenshot-1.png` 例题拆开讲 · `screenshot-2.png` 遮住自己写 · `screenshot-3.png` 语音问 · `screenshot-4.png` 一句话点评 · `screenshot-5.png` 设置
+| Screenshots（按顺序，都是 1280×800） | `screenshot-1.png` 例题的中文翻译，角落里收起的「问一问」 · `screenshot-2.png` 前置知识，展开一项、再要一个更简单的讲法 · `screenshot-3.png` 问一问展开：左边是前置知识，右边是对话 · `screenshot-4.png` 划线提问 · `screenshot-5.png` 例题的「更简单的解释」 |
 
-**这五张图是改版之前的界面（分块、默写、点评），上传前要重拍**：换成例题的中文全文、「前置知识」展开、「问一问」的对话、设置。 |
+这五张是 0.5.1 的界面，用真实的模型回复拍的（Gemini，一题自带的示例题，不含 Math Academy 的内容，不含任何 key）。
 
 截图里用的是一题自带的示例题（我们自己写的），不含 Math Academy 的内容。
 
@@ -100,9 +100,11 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 
 【它能做什么】
 · 中文翻译：把这一步的题目、选项和讲解翻成中文，公式原样保留；随时切回英文原文对照。
-· 前置知识：讲解、例题、练习题，每一步都能看到它背后更基础的概念、方法和公式；每一项可以「进一步展开」（看不懂再点「更简单的解释」）；讲解、例题和交答案后的官方讲解也可以要一个「更简单的解释」：讲清楚，给一个例子，说常见的误区。
+· 前置知识：讲解、例题、练习题，每一步都能看到它背后更基础的概念、方法和公式；每一项可以「进一步展开」：讲清楚，给一个例子，说常见的误区；还觉得难，再点「更简单的解释」，换成基础更少的人也能懂的讲法，最多三种，可以来回翻。
+· 更简单的解释：讲解、例题，以及交了答案之后的官方讲解，也可以让它重新讲一遍，讲给基础更少的人听；官方原文留在上面，模型写的另放一块。
 · 随时问一问：平时收起、只在角落留一小粒，点开才出现（页面下面，宽屏在右边），一边看前置知识一边问，可以问很多轮，不打分。看到不懂的话，划线点一下就问。交了答案之后，什么都可以问，包括这道题怎么做；答错了想问，点一下「讲讲我错在哪」。
 · 语音陪练：卡住时开口问，陪练用中文讲道理，英文说法原样念给你听；说的话和打的字在同一条对话里。
+· 字号：顶栏的 A− A+（或 ⌘＋ ⌘－）把整个页面的字放大缩小；矩阵、分式等公式按原样画出来。
 
 【它守的一条线】
 练习题交答案之前，一题不帮你解这道题。Math Academy 会根据你自己交的答案安排练习和复习；先被讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，并帮你补前置知识：这时的「问一问」看不到你在做的题，只能讲基础知识；交了之后再陪你把这道题弄懂。复习页面当作练习题；测验、诊断、测评等考核页面，一题不读取内容。
@@ -125,9 +127,11 @@ Yiti (一题) is a study companion for Math Academy, made for students who think
 
 What it does
 • Chinese translation: the step's question, choices and explanation in Chinese, with every formula kept as it is; switch back to the English original at any time.
-• Prerequisites: for every step — tutorial, worked example or practice question — the more basic concepts, methods and formulas it rests on; each item can be opened up for an explanation, an example of its own and a common pitfall.
-• Ask any time: keep asking about the step, as many turns as you like, nothing is scored. Once you have answered a practice question you can ask anything, including how it is solved.
-• Voice tutor: when stuck, just ask. It explains in Chinese and says the English terms as they are.
+• Prerequisites: for every step — tutorial, worked example or practice question — the more basic concepts, methods and formulas it rests on; each item can be opened up for an explanation, an example of its own and a common pitfall, and, if that is still too hard, told again more simply (up to three times, and you can go back and forth).
+• Simpler explanations: for a tutorial, a worked example, or the official explanation once you have answered a practice question, ask for it to be retold for someone with less background. Math Academy's own text stays as it is; what the model writes goes in a separate box.
+• Ask any time: tucked away in a corner until you open it; keep asking about the step, as many turns as you like, nothing is scored. Select any words on the page and one click sends them as a question. Once you have answered a practice question you can ask anything, including how it is solved.
+• Voice tutor: when stuck, just ask. It explains in Chinese and says the English terms as they are; what you say and what you type are one conversation.
+• Text size: A− A+ in the header (or Cmd +/−) enlarges or shrinks the whole page; matrices, fractions and other formulas are drawn as they are.
 
 The line it keeps
 Before you answer a practice question, Yiti does not help you solve it. Math Academy plans your practice and reviews from the answers you give on your own; being walked through first would make it think you have mastered the topic. So before you answer, Yiti only translates the question and fills in prerequisite knowledge: the assistant you ask at that point is not shown the question at all. Once you have answered, it walks you through it. A review is treated like a practice question; quizzes, diagnostics and assessments are never read.
@@ -150,21 +154,21 @@ Yiti is an unofficial study tool and is not affiliated with Math Academy.
 
 ## 6. 审核备注（Notes for certification）
 
-提交前，专门给审核员建一个 **Google Gemini 的 API key**（https://aistudio.google.com/apikey ），审核通过后删掉。用量上限只能按项目设，所以把它建在单独的项目里，再给这个项目设月上限（比如 $2）。把 key 填到下面的 `PASTE_KEY_HERE` 处（用尖括号 `<KEY>` 时，Partner Center 的输入框吞掉过它后面的换行）。审核员多半在海外，用 Gemini 最方便；他们大概率没有 Math Academy 账号，所以用内置示例测试。
+提交前，专门给审核员建一个 **Google Gemini 的 API key**（https://aistudio.google.com/apikey ），审核通过后删掉。（0.3.1 那一次用的 key，如果还没删，可以接着用到这一次通过；删不删由你定，通过之后记得删，并删掉 Google 项目 `yiti-review`。）**这个 key 只能由你自己粘贴到备注里，不要发到聊天里。** Partner Center 的备注框限 2000 个字符，下面这份是压缩过的（约 1876 个字符，含 key 的位置）。用量上限只能按项目设，所以把它建在单独的项目里，再给这个项目设月上限（比如 $2）。把 key 填到下面的 `PASTE_KEY_HERE` 处（用尖括号 `<KEY>` 时，Partner Center 的输入框吞掉过它后面的换行）。审核员多半在海外，用 Gemini 最方便；他们大概率没有 Math Academy 账号，所以用内置示例测试。
 
 ```
-How to test without a Math Academy account (it is a paid service):
+Version 0.5.1 is a larger update of the approved 0.3.1; permissions are exactly the same.
 
-1. Click the Yiti icon in the toolbar. The side panel opens and shows Settings.
-2. Under 文字 (text) choose "Gemini"; under 语音陪练 (voice) choose "Gemini Live". Paste this test key into "Gemini API key": PASTE_KEY_HERE
-   Click "保存并测试" (save and test); both lines should show "✓ 可用" (available). Close the dialog.
-3. Click "先看一个示例" (try an example). A built-in worked example (written for this extension, not Math Academy content) opens and is translated into Chinese.
-4. Click "前置知识" (prerequisites): after a few seconds a list of basic concepts, methods and formulas appears. Click "进一步展开" (open up) next to an item for a fuller explanation.
-5. In the box in the pane docked at the bottom ("问一问", ask a question) type a question about the example, e.g. "为什么这样算？", and press "发送" (send) or Cmd+Enter (Ctrl+Enter on Windows); the tutor answers in Chinese.
-6. Click "语音 ⌘]" in the 问一问 pane to start the voice tutor; it starts explaining the current step. If the side panel cannot ask for the microphone, the extension opens a small tab to grant it once. Click the red timer to stop.
-7. "EN" in the header switches between Chinese and the English original.
+How to test without a Math Academy account (a paid service):
+1. Click the Yiti toolbar icon: the side panel opens, showing Settings.
+2. Under 文字 (text) choose Gemini; under 语音陪练 (voice) choose Gemini Live. Paste this test key into "Gemini API key": PASTE_KEY_HERE
+   Click "保存并测试" (save and test); both lines show "✓ 可用". Close the dialog.
+3. Click "先看一个示例" (try an example): a built-in example (written for this extension, not Math Academy content) opens, translated into Chinese.
+4. Click "前置知识" (prerequisites): a list of basic concepts, methods and formulas appears. "进一步展开" opens an item up; under it "更简单的解释" (simpler explanation) retells it, and "上一种讲法" goes back. "更简单的解释" under the example's text retells the example.
+5. Click "问一问" (ask) in the bottom-right corner: the ask pane opens. Type a question, e.g. "为什么这样算？", press 发送 (send) or Cmd+Enter; the tutor answers in Chinese. "收起" (or Cmd+/) puts it back in the corner.
+6. Select some words in the example: a bar with 解释 / 举例 / 为什么 / 引用 appears; the first three send the words as a question.
+7. "语音 ⌘]" (voice), in the corner or the pane, starts the voice tutor. If the panel cannot get the microphone, a small tab asks once. The red timer stops it.
+8. "EN" switches between Chinese and the English original; "A−"/"A+" change the text size.
 
-On mathacademy.com, the content script reads only the lesson step currently open and sends it to the side panel; nothing is read on quizzes, diagnostics or assessments. All model calls go directly from the extension to the provider chosen in Settings, with the user's own key; there is no developer server.
-
-DeepSeek and Alibaba Cloud Model Studio (Qwen) are alternative providers for the same features, chosen in the same Settings dialog and run through the same code; the Gemini test key above covers both text and voice, so no other key is needed. The key exists only for this review and will be deleted afterwards.
+On mathacademy.com the content script reads only the lesson step (or review question) that is open and sends it to the side panel; nothing is read on quizzes, diagnostics or assessments. Model calls go directly from the extension to the provider chosen in Settings, with the user's own key; there is no developer server. DeepSeek and Alibaba Qwen are alternatives through the same code; the Gemini key covers every feature. The key exists only for this review and will be deleted.
 ```
