@@ -4,7 +4,7 @@
 
 ## 1. 上传包（Packages）
 
-上传 `dist/yiti-extension-0.5.1.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。0.3.1 已通过审核（2026-10-02 确认）；0.5.1 是在它基础上的一次大更新（权限和主机权限和 0.3.1 完全一样，没有新增），用「更新」提交，不是新建加载项。
+上传 `dist/yiti-extension-0.6.0.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。0.5.1 已上架（Edge 和 Chrome 都是）；0.6.0 是在它基础上的更新，权限和主机权限完全一样，没有新增，用「更新」提交，不是新建加载项。
 
 包里的 `edge/_locales/<语言>/messages.json` 决定了商店里**不能再改**的两项，每种语言一份：
 
@@ -34,7 +34,7 @@
 ### Single Purpose Description
 
 ```
-Helps Chinese-speaking students study on Math Academy: in a side panel, it follows the lesson step the student has open, translates it into Chinese, lists the more basic prerequisite knowledge behind the step (each item can be opened up for a fuller explanation, and retold more simply), can retell the step's explanation for someone with less background, lets the student ask questions about the step at any time, and offers a voice tutor. It never helps solve a practice question before the student has answered it: until then the assistant is not even shown the question.
+Helps Chinese-speaking students study on Math Academy: in a side panel, it follows the lesson step the student has open, translates it into Chinese, lists the more basic prerequisite knowledge behind the step (each item can be opened up for a fuller explanation, and retold more simply), can retell the step's explanation for someone with less background, shows where the lesson sits in mathematics and what it leads to (real-world uses and the higher mathematics it grows into), lets the student ask questions about the step at any time, and offers a voice tutor. Besides lesson steps and review questions, it follows a topic's own notes page and the answers of a task already done. It never helps solve a practice question before the student has answered it: until then the assistant is not even shown the question.
 ```
 
 ### Permission justification
@@ -44,7 +44,7 @@ Helps Chinese-speaking students study on Math Academy: in a side panel, it follo
 | sidePanel | `The whole extension is shown in the browser side panel, next to the Math Academy lesson.` |
 | storage | `Stores the user's settings (chosen AI provider and their own API key), learning records and usage counts locally in the browser. Nothing is sent to the developer.` |
 | unlimitedStorage | `Learning records keep each lesson step with its formulas (MathML) and the student's work; over many lessons this can exceed the default 10 MB local storage quota.` |
-| Host: mathacademy.com（内容脚本） | `A content script reads only the lesson step, or the review question, currently open on mathacademy.com (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along. On quizzes, diagnostics, assessments and other pages it reads only the page type.` |
+| Host: mathacademy.com（内容脚本） | `A content script reads only the step currently open on mathacademy.com (a lesson step, a review question, a section of a topic's notes page, or a question in the answers of a finished task: text, formulas, the chosen answer and, after answering, the explanation) and the names of Math Academy's listed prerequisite topics, so the side panel can follow along. On quizzes, diagnostics, assessments and other pages it reads only the page type.` |
 | Host: generativelanguage.googleapis.com | `Calls the Google Gemini API with the user's own API key, when the user chooses Gemini for translation and questions or for the voice tutor.` |
 | Host: api.deepseek.com | `Calls the DeepSeek API with the user's own API key, when the user chooses DeepSeek for translation and questions.` |
 | Host: dashscope.aliyuncs.com, dashscope-intl.aliyuncs.com | `Calls Alibaba Cloud Model Studio (Qwen) with the user's own API key, when the user chooses Qwen for translation and questions.` |
@@ -53,7 +53,7 @@ Helps Chinese-speaking students study on Math Academy: in a side panel, it follo
 Partner Center 里所有网站（Host）权限只有**一个**框，实际填的是合在一起的这段：
 
 ```
-mathacademy.com (content script): reads only the lesson step, or the review question, currently open (text, formulas, the chosen answer and, after answering, the explanation) so the side panel can follow along; on quizzes, diagnostics, assessments and other pages it reads only the page type. The other hosts are AI providers, contacted directly with the user's own API key and only when the user chooses them in Settings: generativelanguage.googleapis.com (Google Gemini, text and voice); api.deepseek.com (DeepSeek, text); dashscope.aliyuncs.com and dashscope-intl.aliyuncs.com (Alibaba Cloud Model Studio / Qwen, text); *.maas.aliyuncs.com (Qwen voice over WebRTC at the user's own workspace address https://<workspace>.<region>.maas.aliyuncs.com, so the subdomain cannot be listed in advance). No developer server is contacted.
+mathacademy.com (content script): reads only the step currently open (a lesson step, a review question, a section of a topic's notes page, or a question in a finished task's answers: text, formulas, the chosen answer and, after answering, the explanation) and the names of Math Academy's listed prerequisite topics, so the side panel can follow along; on quizzes, diagnostics, assessments and other pages it reads only the page type. The other hosts are AI providers, contacted directly with the user's own API key and only when the user chooses them in Settings: generativelanguage.googleapis.com (Google Gemini, text and voice); api.deepseek.com (DeepSeek, text); dashscope.aliyuncs.com and dashscope-intl.aliyuncs.com (Alibaba Cloud Model Studio / Qwen, text); *.maas.aliyuncs.com (Qwen voice over WebRTC at the user's own workspace address https://<workspace>.<region>.maas.aliyuncs.com, so the subdomain cannot be listed in advance). No developer server is contacted.
 ```
 
 ### Are you using remote code?
@@ -89,7 +89,7 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 | Large promotional tile | `tile-1400x560.png` |
 | Screenshots（按顺序，都是 1280×800） | `screenshot-1.png` 例题的中文翻译，角落里收起的「问一问」 · `screenshot-2.png` 前置知识，展开一项、再要一个更简单的讲法 · `screenshot-3.png` 问一问展开：左边是前置知识，右边是对话 · `screenshot-4.png` 划线提问 · `screenshot-5.png` 例题的「更简单的解释」 |
 
-这五张是 0.5.1 的界面，用真实的模型回复拍的（Gemini，一题自带的示例题，不含 Math Academy 的内容，不含任何 key）。
+这五张是 0.5.1 的界面，用真实的模型回复拍的（Gemini，一题自带的示例题，不含 Math Academy 的内容，不含任何 key）。0.6.0 沿用这五张：界面主体没变，新功能（定位、学这个有什么用）只写在描述里。
 
 截图里用的是一题自带的示例题（我们自己写的），不含 Math Academy 的内容。
 
@@ -104,10 +104,14 @@ https://github.com/John15263/yiti/blob/main/PRIVACY.md
 · 更简单的解释：讲解、例题，以及交了答案之后的官方讲解，也可以让它重新讲一遍，讲给基础更少的人听；官方原文留在上面，模型写的另放一块。
 · 随时问一问：平时收起、只在角落留一小粒，点开才出现（页面下面，宽屏在右边），一边看前置知识一边问，可以问很多轮，不打分。看到不懂的话，划线点一下就问。交了答案之后，什么都可以问，包括这道题怎么做；答错了想问，点一下「讲讲我错在哪」。
 · 语音陪练：卡住时开口问，陪练用中文讲道理，英文说法原样念给你听；说的话和打的字在同一条对话里。
+· 定位：步骤标题下面一行，说这节课在数学里的位置（科目 · 模块 · 学段），点开看它讲什么、建立在哪些更早的模块上。
+· 学这个有什么用：这节课以后通向哪里。工程化与现实应用分「身边、大工程、黑魔法」三层，再学哪几个模块、能解决哪类问题、对应现实里的哪件事；高级数学衔接说它会长成哪些更高级的数学，那一层又拿来做什么。每一条都能点开细讲，也能要更简单的解释。
+· Math Academy 官方前置：Math Academy 自己列的前置知识点，翻成中文放在前置知识最上面，点一下打开它的讲义。
+· 不只上课页面：知识点讲义页、学习主页里做过的题，一题也跟着走。
 · 字号：顶栏的 A− A+（或 ⌘＋ ⌘－）把整个页面的字放大缩小；矩阵、分式等公式按原样画出来。
 
 【它守的一条线】
-练习题交答案之前，一题不帮你解这道题。Math Academy 会根据你自己交的答案安排练习和复习；先被讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，并帮你补前置知识：这时的「问一问」看不到你在做的题，只能讲基础知识；交了之后再陪你把这道题弄懂。复习页面当作练习题；测验、诊断、测评等考核页面，一题不读取内容。
+练习题交答案之前，一题不帮你解这道题。Math Academy 会根据你自己交的答案安排练习和复习；先被讲会了再交，它就会以为你已经掌握了。所以交答案之前，一题只翻译题目，并帮你补前置知识：这时的「问一问」看不到你在做的题，只能讲基础知识；交了之后再陪你把这道题弄懂。复习页面当作练习题，交答案之前也不显示定位和「学这个有什么用」（它们会透露这道题考的是哪一块）；测验、诊断、测评等考核页面，一题不读取内容。
 
 【怎么用】
 1. 点工具栏上的一题图标，侧边栏打开。
@@ -131,10 +135,14 @@ What it does
 • Simpler explanations: for a tutorial, a worked example, or the official explanation once you have answered a practice question, ask for it to be retold for someone with less background. Math Academy's own text stays as it is; what the model writes goes in a separate box.
 • Ask any time: tucked away in a corner until you open it; keep asking about the step, as many turns as you like, nothing is scored. Select any words on the page and one click sends them as a question. Once you have answered a practice question you can ask anything, including how it is solved.
 • Voice tutor: when stuck, just ask. It explains in Chinese and says the English terms as they are; what you say and what you type are one conversation.
+• Where it sits: a line under the step's title gives the lesson's place in mathematics (subject, module, school stage); open it for what the lesson covers and the earlier modules it builds on.
+• What it is for: where the lesson leads. Real-world uses in three layers (everyday, big engineering, and "black magic" that hardly looks like mathematics): which modules come next, what kind of problem they solve and what that is in real life; and the higher mathematics it grows into, with what that is used for. Every entry opens up, and can be told more simply.
+• Math Academy's own prerequisites: the prerequisite topics Math Academy lists, in Chinese at the top of the prerequisites, each linked to its notes page.
+• More than lesson steps: a topic's notes page and the answers of a task already done are followed too.
 • Text size: A− A+ in the header (or Cmd +/−) enlarges or shrinks the whole page; matrices, fractions and other formulas are drawn as they are.
 
 The line it keeps
-Before you answer a practice question, Yiti does not help you solve it. Math Academy plans your practice and reviews from the answers you give on your own; being walked through first would make it think you have mastered the topic. So before you answer, Yiti only translates the question and fills in prerequisite knowledge: the assistant you ask at that point is not shown the question at all. Once you have answered, it walks you through it. A review is treated like a practice question; quizzes, diagnostics and assessments are never read.
+Before you answer a practice question, Yiti does not help you solve it. Math Academy plans your practice and reviews from the answers you give on your own; being walked through first would make it think you have mastered the topic. So before you answer, Yiti only translates the question and fills in prerequisite knowledge: the assistant you ask at that point is not shown the question at all. Once you have answered, it walks you through it. A review is treated like a practice question, and before it is answered it does not show where the topic sits or what it leads to (that would give away what is being tested); quizzes, diagnostics and assessments are never read.
 
 How to use
 1. Click the Yiti icon in the toolbar to open the side panel.
@@ -154,21 +162,21 @@ Yiti is an unofficial study tool and is not affiliated with Math Academy.
 
 ## 6. 审核备注（Notes for certification）
 
-提交前，专门给审核员建一个 **Google Gemini 的 API key**（https://aistudio.google.com/apikey ），审核通过后删掉。（0.3.1 那一次用的 key，如果还没删，可以接着用到这一次通过；删不删由你定，通过之后记得删，并删掉 Google 项目 `yiti-review`。）**这个 key 只能由你自己粘贴到备注里，不要发到聊天里。** Partner Center 的备注框限 2000 个字符，下面这份是压缩过的（约 1876 个字符，含 key 的位置）。用量上限只能按项目设，所以把它建在单独的项目里，再给这个项目设月上限（比如 $2）。把 key 填到下面的 `PASTE_KEY_HERE` 处（用尖括号 `<KEY>` 时，Partner Center 的输入框吞掉过它后面的换行）。审核员多半在海外，用 Gemini 最方便；他们大概率没有 Math Academy 账号，所以用内置示例测试。
+提交前，专门给审核员建一个 **Google Gemini 的 API key**（https://aistudio.google.com/apikey ），审核通过后删掉。（0.3.1 那一次用的 key，如果还没删，可以接着用到这一次通过；删不删由你定，通过之后记得删，并删掉 Google 项目 `yiti-review`。）**这个 key 只能由你自己粘贴到备注里，不要发到聊天里。** Partner Center 的备注框限 2000 个字符，下面这份是压缩过的（约 1746 个字符，含 key 的位置）。用量上限只能按项目设，所以把它建在单独的项目里，再给这个项目设月上限（比如 $2）。把 key 填到下面的 `PASTE_KEY_HERE` 处（用尖括号 `<KEY>` 时，Partner Center 的输入框吞掉过它后面的换行）。审核员多半在海外，用 Gemini 最方便；他们大概率没有 Math Academy 账号，所以用内置示例测试。
 
 ```
-Version 0.5.1 is a larger update of the approved 0.3.1; permissions are exactly the same.
+Version 0.6.0 updates the published 0.5.1; permissions are exactly the same.
 
 How to test without a Math Academy account (a paid service):
 1. Click the Yiti toolbar icon: the side panel opens, showing Settings.
 2. Under 文字 (text) choose Gemini; under 语音陪练 (voice) choose Gemini Live. Paste this test key into "Gemini API key": PASTE_KEY_HERE
    Click "保存并测试" (save and test); both lines show "✓ 可用". Close the dialog.
 3. Click "先看一个示例" (try an example): a built-in example (written for this extension, not Math Academy content) opens, translated into Chinese.
-4. Click "前置知识" (prerequisites): a list of basic concepts, methods and formulas appears. "进一步展开" opens an item up; under it "更简单的解释" (simpler explanation) retells it, and "上一种讲法" goes back. "更简单的解释" under the example's text retells the example.
-5. Click "问一问" (ask) in the bottom-right corner: the ask pane opens. Type a question, e.g. "为什么这样算？", press 发送 (send) or Cmd+Enter; the tutor answers in Chinese. "收起" (or Cmd+/) puts it back in the corner.
-6. Select some words in the example: a bar with 解释 / 举例 / 为什么 / 引用 appears; the first three send the words as a question.
-7. "语音 ⌘]" (voice), in the corner or the pane, starts the voice tutor. If the panel cannot get the microphone, a small tab asks once. The red timer stops it.
-8. "EN" switches between Chinese and the English original; "A−"/"A+" change the text size.
+4. Click "前置知识" (prerequisites): a list of basic concepts, methods and formulas. "进一步展开" opens an item; "更简单的解释" retells it more simply, "上一种讲法" goes back.
+5. New in 0.6.0: under the step title, "定位" shows where the lesson sits in mathematics ("展开" for more). Click "学这个有什么用" (what is it for): real-world uses and the higher mathematics it leads to; "具体怎么用上" and "那一层有什么用" open an entry, each with "更简单的解释".
+6. Click "问一问" (ask) in the bottom-right corner, type a question and press 发送 (send); the tutor answers in Chinese. Selecting words in the example shows 解释 / 举例 / 为什么 / 引用.
+7. "语音 ⌘]" (voice) starts the voice tutor; if the panel cannot get the microphone, a small tab asks once.
+8. "EN" switches to the English original; "A−"/"A+" change the text size.
 
-On mathacademy.com the content script reads only the lesson step (or review question) that is open and sends it to the side panel; nothing is read on quizzes, diagnostics or assessments. Model calls go directly from the extension to the provider chosen in Settings, with the user's own key; there is no developer server. DeepSeek and Alibaba Qwen are alternatives through the same code; the Gemini key covers every feature. The key exists only for this review and will be deleted.
+On mathacademy.com the content script reads only the step that is open (a lesson step, review question, topic notes section or a finished task's answer) and the names of listed prerequisite topics; nothing is read on quizzes, diagnostics or assessments. Model calls go directly to the provider chosen in Settings with the user's own key; there is no developer server. The key exists only for this review and will be deleted.
 ```
