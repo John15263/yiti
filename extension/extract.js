@@ -79,17 +79,31 @@
       return math ? `{${mmlTex(math)}}` : titleTex(c);
     }).join('');
   }
+  // 沉浸式翻译 (Immersive Translate) writes its Chinese into the page, each paragraph's in one of these, and copies the
+  // formulas into it: a typeset SVG without its .mjpage around it, a live one as an <mjx-container> MathJax never made.
+  const TRANSLATED = '.immersive-translate-target-wrapper';
+  const COPIED = '[data-immersive-translate-translation-element-mark]';
+  const isFormula = el => el.matches('.mjpage, mjx-container');
+  // Beside the English (its bilingual mode) the Chinese is passed by, and Math Academy's own words are read. In place of
+  // the English (translation only) the Chinese is all there is: what is left beside it is display formulas at most.
+  const beside = node => [...node.parentNode.childNodes].some(c => c !== node && (c.nodeType === 3 ? c.nodeValue.trim()
+    : c.nodeType === 1 && !c.matches(TRANSLATED) && !isFormula(c) && c.textContent.trim()));
+
   // Formulas come two ways: typeset ahead of time as SVG with the TeX in its <title>, or live by MathJax.
   function formula(node, live) {
     let tex = '', display = false;
-    if (node.classList?.contains('mjpage')) {
+    const copied = node.tagName === 'svg' && !node.closest('.mjpage') && node.closest(COPIED) && node.querySelector('title');
+    if (node.classList?.contains('mjpage') || copied) {
       const title = node.querySelector('title');
       // Never let an odd formula stop the whole step from being read: its plain text is better than nothing.
       try { tex = title ? titleTex(title) : ''; } catch { tex = title?.textContent || ''; }
       display = node.classList.contains('mjpage__block');
     } else if (node.tagName === 'MJX-CONTAINER') {
       const item = live.find(m => m.typesetRoot === node);
-      tex = item?.math || ''; display = node.getAttribute('display') === 'true' || !!item?.display;
+      // A copy has no item of its own; its TeX comes back from the MathML it carries for screen readers.
+      const mml = item ? null : node.querySelector('mjx-assistive-mml math');
+      try { tex = item?.math || (mml ? mmlTex(mml) : ''); } catch { tex = ''; }
+      display = node.getAttribute('display') === 'true' || !!item?.display;
     } else return null;
     tex = tex.trim();
     return tex ? { t: 'math', tex, display, mml: toMml(tex, display) } : { t: 'text', v: node.textContent || '' };
@@ -112,8 +126,10 @@
     };
     const walk = node => {
       if (node.nodeType === 3) { line.push({ t: 'text', v: node.nodeValue.replace(/\s+/g, ' ') }); return; }
-      if (node.nodeType !== 1 || ['STYLE', 'SCRIPT', 'BUTTON', 'IMG', 'svg', 'NOSCRIPT'].includes(node.tagName)) return;
+      if (node.nodeType !== 1 || ['STYLE', 'SCRIPT', 'BUTTON', 'IMG', 'NOSCRIPT'].includes(node.tagName)) return;
       if (node.matches(SKIP) || node.checkVisibility?.() === false) return;
+      if (node.matches(TRANSLATED) && beside(node)) return;
+      if (node.tagName === 'svg') { const math = formula(node, live); if (math) line.push(math); return; }
       if (node.tagName === 'BR') { flush(); return; }
       // An answer box (MathQuill, as Math Academy uses it, or any other field) is a blank in the question: what is typed
       // into it is not the question's words, and must not make it look like another question.
