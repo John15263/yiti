@@ -55,6 +55,9 @@ test('fractions, roots, scripts, Greek letters and symbols', () => {
   assert.match(ok('3.14\\times 2'), /<mn>3\.14<\/mn><mo>×<\/mo><mn>2<\/mn>/);
   assert.match(ok('\\left(\\frac{a}{b}\\right)'), /<mrow><mo>\(<\/mo><mstyle[^>]*><mfrac>.*<\/mfrac><\/mstyle><mo>\)<\/mo><\/mrow>/);
   assert.match(ok('\\text{ if } x'), /<mtext> if <\/mtext>/);
+  // Without braces \text takes the one character after it, as DeepSeek writes \textrm E[X].
+  assert.match(ok('\\textrm E[X]\\approx 2.2778'), /^<math><mrow><mtext>E<\/mtext><mo>\[<\/mo><mi>X<\/mi><mo>]<\/mo>/);
+  assert.match(ok('\\textrm{Var}[X]=\\textrm E[X^2]-(\\textrm E[X])^2'), /<mtext>Var<\/mtext>.*<mtext>E<\/mtext>.*<mtext>E<\/mtext>/);
   assert.match(ok('\\binom{n}{k}'), /linethickness="0"/);
 });
 

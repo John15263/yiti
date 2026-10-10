@@ -111,10 +111,17 @@ class Parser {
     if (!node?.ml) this.fail('empty argument');
     return node.ml;
   }
-  // The text between braces, read as it is (for \text).
+  // The text between braces, read as it is (for \text). Without braces, as in TeX, it is the one character
+  // that follows (\textrm E, as models write it).
   raw() {
     this.skip();
-    if (this.s[this.i] !== '{') this.fail('expected {');
+    const c = this.s[this.i];
+    if (c !== '{') {
+      if (c === undefined || '\\}&^_$'.includes(c)) this.fail('expected {');
+      const one = String.fromCodePoint(this.s.codePointAt(this.i));
+      this.i += one.length;
+      return one;
+    }
     let depth = 0;
     const start = ++this.i;
     for (; this.i < this.s.length; this.i++) {
