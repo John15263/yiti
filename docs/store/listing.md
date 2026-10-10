@@ -4,7 +4,7 @@
 
 ## 1. 上传包（Packages）
 
-上传 `dist/yiti-extension-0.6.0.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。0.5.1 已上架（Edge 和 Chrome 都是）；0.6.0 是在它基础上的更新，权限和主机权限完全一样，没有新增，用「更新」提交，不是新建加载项。
+上传 `dist/yiti-extension-0.6.1.zip`（在仓库里运行 `node edge/build.mjs` 生成，也可以从 [Releases](https://github.com/John15263/yiti/releases) 下载）。0.5.1 已上架（Edge 和 Chrome 都是）；0.6.0 是在它基础上的更新，权限和主机权限完全一样，没有新增，用「更新」提交，不是新建加载项。
 
 包里的 `edge/_locales/<语言>/messages.json` 决定了商店里**不能再改**的两项，每种语言一份：
 
